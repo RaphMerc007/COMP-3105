@@ -7,8 +7,7 @@ from scipy.optimize import minimize
 
 
 def minimizeL2(X, y):
-    # TODO: Implement L2 regression
-    pass
+    return np.linalg.inv(X.T @ X) @ X.T @ y
 
 
 def minimizeLinf(X, y):
