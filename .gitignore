@@ -59,3 +59,7 @@ coverage.xml
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Installers
+Miniconda3-latest-MacOSX-arm64.sh
+*.sh
