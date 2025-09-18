@@ -35,6 +35,10 @@ def _plotReg():
 	plt.plot(X[:, 1], y_hat_Linf, 'r', marker=None, label='$L_\infty$')
 	plt.legend()
 	plt.show()
+	train_loss, test_loss = A1codes.synRegExperiments()
+	print("Losses:")
+	print(train_loss)
+	print(test_loss)
 
 
 def _plotCls():

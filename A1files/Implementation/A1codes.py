@@ -2,10 +2,8 @@
 # Raphael Mercier & Patrick
 # Machine Learning Optimization Algorithms Implementation
 
-from cgi import test
 from cvxopt import matrix, solvers
 import numpy as np
-from scipy.optimize import minimize
 
 
 def minimizeL2(X, y):
@@ -63,6 +61,31 @@ def synRegExperiments():
       y[0] *= -0.1
     return X, y
 
+  def load_csv_data(train_path, test_path):
+    """
+    Load data from CSV files for regression
+    """
+    import pandas as pd
+    
+    # Load training data
+    train_df = pd.read_csv(train_path)
+    Xtrain = train_df[['x']].values
+    ytrain = train_df[['y']].values
+    
+    # Add bias term (column of ones) to Xtrain
+    Xtrain = np.concatenate((np.ones((Xtrain.shape[0], 1)), Xtrain), axis=1)
+    
+    # Load test data
+    test_df = pd.read_csv(test_path)
+    Xtest = test_df[['x']].values
+    ytest = test_df[['y']].values
+    
+    # Add bias term (column of ones) to Xtest
+    Xtest = np.concatenate((np.ones((Xtest.shape[0], 1)), Xtest), axis=1)
+
+    return Xtrain, ytrain, Xtest, ytest
+
+
   n_runs = 100
   n_train = 30
   n_test = 1000
@@ -74,8 +97,14 @@ def synRegExperiments():
 
   for r in range(n_runs):
     w_true = np.random.randn(d + 1, 1)
+    
+    # Using genData
     Xtrain, ytrain = genData(n_train, is_training=True)
     Xtest, ytest = genData(n_test, is_training=False)
+
+    # Using the toy data that was given
+    # Xtrain, ytrain, Xtest, ytest  = load_csv_data("./toy_data/regression_train.csv","./toy_data/regression_test.csv")
+
     w_L2 = minimizeL2(Xtrain, ytrain)
     w_Linf = minimizeLinf(Xtrain, ytrain)
   
@@ -87,11 +116,11 @@ def synRegExperiments():
     # L2 model, L2 loss
     train_loss[r, 0, 0] = np.mean(0.5 * ((ytrain - train_pred_L2)**2))
     # L2 model, Linf loss
-    train_loss[r, 0, 1] = np.mean(np.abs(ytrain - train_pred_L2))
+    train_loss[r, 0, 1] = np.max(np.abs(ytrain - train_pred_L2))
     # Linf model, L2 loss
     train_loss[r, 1, 0] = np.mean(0.5 * ((ytrain - train_pred_Linf)**2))
     # Linf model, Linf loss
-    train_loss[r, 1, 1] = np.mean(np.abs(ytrain - train_pred_Linf))
+    train_loss[r, 1, 1] = np.max(np.abs(ytrain - train_pred_Linf))
 
 
     # Get test data loss
@@ -102,11 +131,11 @@ def synRegExperiments():
     # L2 model, L2 loss
     test_loss[r, 0, 0] = np.mean(0.5 * ((ytest - test_pred_L2)**2))
     # L2 model, Linf loss
-    test_loss[r, 0, 1] = np.mean(np.abs(ytest - test_pred_L2))
+    test_loss[r, 0, 1] = np.max(np.abs(ytest - test_pred_L2))
     # Linf model, L2 loss
     test_loss[r, 1, 0] = np.mean(0.5 * ((ytest - test_pred_Linf)**2))
     # Linf model, Linf loss
-    test_loss[r, 1, 1] = np.mean(np.abs(ytest - test_pred_Linf))
+    test_loss[r, 1, 1] = np.max(np.abs(ytest - test_pred_Linf))
   
   
   # compute average losses for training data
