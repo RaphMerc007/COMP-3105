@@ -48,7 +48,8 @@ def minimizeLinf(X, y):
   # TODO: Need to uncomment this before submition
   # solvers.options['show progress'] = False
 
-  return solvers.lp(c,G,h)
+  sol = solvers.lp(c,G,h)
+  return np.array(sol['x'])[:d]
 
 def synRegExperiments():
   def genData(n_points, is_training=False):

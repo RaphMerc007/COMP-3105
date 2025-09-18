@@ -18,6 +18,9 @@ def _plotReg():
 	X = np.random.randn(n, d)  # input matrix
 	y = X + np.random.randn(n, 1) * noise + 2  # ground truth label
 
+  # Creating outlier 
+	y[-1] = 15
+	X[-1] = 3
 	plt.scatter(X, y, marker='x', color='k')  # plot data points
 
 	# learning
@@ -25,7 +28,6 @@ def _plotReg():
 	w_L2 = A1codes.minimizeL2(X, y)
 	y_hat_L2 = X @ w_L2
 	w_Linf = A1codes.minimizeLinf(X, y)
-	print(w_Linf)
 	y_hat_Linf = X @ w_Linf
 
 	# plot models
