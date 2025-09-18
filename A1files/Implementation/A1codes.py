@@ -49,6 +49,40 @@ def minimizeLinf(X, y):
 
   return solvers.lp(c,G,h)
 
+def synRegExperiments():
+  def genData(n_points, is_training=False):
+    '''
+    This function generate synthetic data
+    '''
+    X = np.random.randn(n_points, d) # input matrix
+    X = np.concatenate((np.ones((n_points, 1)), X), axis=1) # augment input
+    y = X @ w_true + np.random.randn(n_points, 1) * noise # ground truth label
+    if is_training:
+      y[0] *= -0.1
+    return X, y
+
+  n_runs = 100
+  n_train = 30
+  n_test = 1000
+  d = 5
+  noise = 0.2
+  train_loss = np.zeros([n_runs, 2, 2]) # n_runs * n_models * n_metrics
+  test_loss = np.zeros([n_runs, 2, 2]) # n_runs * n_models * n_metrics
+  np.random.seed(101306865)
+
+  for r in range(n_runs):
+    w_true = np.random.randn(d + 1, 1)
+    Xtrain, ytrain = genData(n_train, is_training=True)
+    Xtest, ytest = genData(n_test, is_training=False)
+    w_L2 = minimizeL2(Xtrain, ytrain)
+    w_Linf = minimizeLinf(Xtrain, ytrain)
+    # TODO: Evaluate the two models' performance (for each model, calculate the L2 and L infinity losses on the training data). Save them to `train_loss`
+    
+    # TODO: Evaluate the two models' performance (for each model, calculate the L2 and L infinity losses on the test data). Save them to `test_loss`
+  
+  # TODO: compute the average losses over runs
+  
+  # TODO: return a 2-by-2 training loss variable and a 2-by-2 test loss variable
 
 def logisticRegObj(w, X, y):
   # TODO: Implement logistic regression objective
