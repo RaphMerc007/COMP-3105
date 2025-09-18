@@ -25,6 +25,7 @@ def _plotReg():
 	w_L2 = A1codes.minimizeL2(X, y)
 	y_hat_L2 = X @ w_L2
 	w_Linf = A1codes.minimizeLinf(X, y)
+	print(w_Linf)
 	y_hat_Linf = X @ w_Linf
 
 	# plot models
@@ -65,4 +66,4 @@ def _plotCls():
 if __name__ == "__main__":
 
 	_plotReg()
-	_plotCls()
+	# _plotCls()
