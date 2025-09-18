@@ -2,6 +2,7 @@
 # Raphael Mercier & Patrick
 # Machine Learning Optimization Algorithms Implementation
 
+from cgi import test
 from cvxopt import matrix, solvers
 import numpy as np
 from scipy.optimize import minimize
@@ -76,13 +77,52 @@ def synRegExperiments():
     Xtest, ytest = genData(n_test, is_training=False)
     w_L2 = minimizeL2(Xtrain, ytrain)
     w_Linf = minimizeLinf(Xtrain, ytrain)
-    # TODO: Evaluate the two models' performance (for each model, calculate the L2 and L infinity losses on the training data). Save them to `train_loss`
-    
-    # TODO: Evaluate the two models' performance (for each model, calculate the L2 and L infinity losses on the test data). Save them to `test_loss`
   
-  # TODO: compute the average losses over runs
+    # Get train data loss
+    # Get Xw for different models
+    train_pred_L2 = Xtrain @ w_L2
+    train_pred_Linf = Xtrain @ w_Linf
+
+    # L2 model, L2 loss
+    train_loss[r, 0, 0] = np.mean(0.5 * ((ytrain - train_pred_L2)**2))
+    # L2 model, Linf loss
+    train_loss[r, 0, 1] = np.mean(np.abs(ytrain - train_pred_L2))
+    # Linf model, L2 loss
+    train_loss[r, 1, 0] = np.mean(0.5 * ((ytrain - train_pred_Linf)**2))
+    # Linf model, Linf loss
+    train_loss[r, 1, 1] = np.mean(np.abs(ytrain - train_pred_Linf))
+
+
+    # Get test data loss
+    # Get Xw for different models
+    test_pred_L2 = Xtest @ w_L2
+    test_pred_Linf = Xtest @ w_Linf
+
+    # L2 model, L2 loss
+    test_loss[r, 0, 0] = np.mean(0.5 * ((ytest - test_pred_L2)**2))
+    # L2 model, Linf loss
+    test_loss[r, 0, 1] = np.mean(np.abs(ytest - test_pred_L2))
+    # Linf model, L2 loss
+    test_loss[r, 1, 0] = np.mean(0.5 * ((ytest - test_pred_Linf)**2))
+    # Linf model, Linf loss
+    test_loss[r, 1, 1] = np.mean(np.abs(ytest - test_pred_Linf))
   
-  # TODO: return a 2-by-2 training loss variable and a 2-by-2 test loss variable
+  
+  # compute average losses for training data
+  train_avg_loss = np.zeros([2,2])
+  train_avg_loss[0,0] = np.sum(train_loss[:,0,0])/n_runs
+  train_avg_loss[0,1] = np.sum(train_loss[:,0,1])/n_runs
+  train_avg_loss[1,0] = np.sum(train_loss[:,1,0])/n_runs
+  train_avg_loss[1,1] = np.sum(train_loss[:,1,1])/n_runs
+  
+  # compute average losses for test data
+  test_avg_loss = np.zeros([2,2])
+  test_avg_loss[0,0] = np.sum(test_loss[:,0,0])/n_runs
+  test_avg_loss[0,1] = np.sum(test_loss[:,0,1])/n_runs
+  test_avg_loss[1,0] = np.sum(test_loss[:,1,0])/n_runs
+  test_avg_loss[1,1] = np.sum(test_loss[:,1,1])/n_runs
+
+  return train_avg_loss, test_avg_loss
 
 def logisticRegObj(w, X, y):
   # TODO: Implement logistic regression objective
