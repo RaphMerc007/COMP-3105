@@ -39,6 +39,18 @@ def _plotReg():
   print("Losses:")
   print(train_loss)
   print(test_loss)
+  
+  train_loss, test_loss = A1codes.runCCS("./concrete+compressive+strength")
+  print("Real world test:")
+  print("Training data:")
+  print("           | L2 loss              | Linf loss")
+  print("L2 model   | ",train_loss[0,0], "  | ",train_loss[0,1])
+  print("Linf model | ",train_loss[1,0], " | ",train_loss[1,1])
+  print("\nTest data:")
+  print("           | L2 loss              | Linf loss")
+  print("L2 model   | ",test_loss[0,0], "  | ",test_loss[0,1])
+  print("Linf model | ",test_loss[1,0], " | ",test_loss[1,1])
+
 
 
 def _plotCls():
