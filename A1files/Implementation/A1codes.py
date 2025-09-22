@@ -313,5 +313,78 @@ def logisticRegGrad(w, X, y):
 
   return (1/y_flat.shape[0]) * X.T @ (sigmoid - y_flat)
 
+def synClsExperiments():
+  def genData(n_points, dim1, dim2):
+    '''
+    This function generate synthetic data
+    '''
+    c0 = np.ones([1, dim1]) # class 0 center
+    c1 = -np.ones([1, dim1]) # class 1 center
+    X0 = np.random.randn(n_points, dim1 + dim2) # class 0 input
+    X0[:, :dim1] += c0
+    X1 = np.random.randn(n_points, dim1 + dim2) # class 1 input
+    X1[:, :dim1] += c1
+    X = np.concatenate((X0, X1), axis=0)
+    X = np.concatenate((np.ones((2 * n_points, 1)), X), axis=1) # augmentation
+    y = np.concatenate([np.zeros([n_points, 1]), np.ones([n_points, 1])], axis=0)
+    return X, y
+
+  def runClsExp(m=100, dim1=2, dim2=2):
+    '''
+    Run classification experiment with the specified arguments
+    '''
+    n_test = 1000
+    Xtrain, ytrain = genData(m, dim1, dim2)
+    Xtest, ytest = genData(n_test, dim1, dim2)
+    w_logit = find_opt(logisticRegObj, logisticRegGrad, Xtrain, ytrain)
+    # ytrain_hat = # TODO: Compute predicted labels of the training points
+    # train_acc = # TODO: Compute the accuarcy of the training set
+    # ytest_hat = # TODO: Compute predicted labels of the test points
+    # test_acc = # TODO: Compute the accuarcy of the test set
+    return train_acc, test_acc
+  
+  n_runs = 100
+  train_acc = np.zeros([n_runs, 4, 3])
+  test_acc = np.zeros([n_runs, 4, 3])
+  # TODO: Change the following random seed to one of your student IDs
+  np.random.seed(42)
+  for r in range(n_runs):
+    for i, m in enumerate((10, 50, 100, 200)):
+      train_acc[r, i, 0], test_acc[r, i, 0] = runClsExp(m=m)
+    for i, dim1 in enumerate((1, 2, 4, 8)):
+      train_acc[r, i, 1], test_acc[r, i, 1] = runClsExp(dim1=dim1)
+    for i, dim2 in enumerate((1, 2, 4, 8)):
+      train_acc[r, i, 2], test_acc[r, i, 2] = runClsExp(dim2=dim2)
+  # TODO: compute the average accuracies over runs
+  # TODO: return a 4-by-3 training accuracy variable and a 4-by-3 test accuracy variable
+
+  return 1 # placeholder
 
 
+def preprocessBCW(dataset_folder):
+
+  # TODO: implement function 
+
+  pass
+
+def runBCW(dataset_folder):
+  X, y = preprocessBCW(dataset_folder)
+  n, d = X.shape
+  X = np.concatenate((np.ones((n, 1)), X), axis=1) # augment
+  n_runs = 100
+  train_acc = np.zeros([n_runs])
+  test_acc = np.zeros([n_runs])
+  # TODO: Change the following random seed to one of your student IDs
+  np.random.seed(42)
+  for r in range(n_runs):
+  # TODO: Randomly partition the dataset into two parts (50%
+  # training and 50% test)
+  w = find_opt(logisticRegObj, logisticRegGrad, Xtrain, ytrain)
+  # TODO: Evaluate the model's accuracy on the training
+  # data. Save it to `train_acc`
+  # TODO: Evaluate the model's accuracy on the test
+  # data. Save it to `test_acc`
+  # TODO: compute the average accuracies over runs
+  # TODO: return two variables: the average training accuracy and average test accuracy
+
+  pass
