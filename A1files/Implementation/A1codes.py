@@ -4,6 +4,7 @@
 
 from math import ceil, floor
 from cvxopt import matrix, solvers
+from scipy.optimize import minimize
 import numpy as np  
 import pandas as pd
 import os 
@@ -106,7 +107,15 @@ def synRegExperiments():
     # Xtrain, ytrain, Xtest, ytest  = load_csv_data("./toy_data/regression_train.csv","./toy_data/regression_test.csv")
 
     w_L2 = minimizeL2(Xtrain, ytrain)
-    w_Linf = minimizeLinf(Xtrain, ytrain)
+
+    #compare minimizeL2 and find_opt
+    # print("weights from minimizeL2:", w_L2.flatten()) 
+    
+    # w_opt = find_opt(linearRegL2Obj, linearRegL2Grad, Xtrain, ytrain)
+
+    # print("weights from find_opt:", w_opt.flatten()) 
+
+    # w_Linf = minimizeLinf(Xtrain, ytrain)
   
     # Get train data loss
     # Get Xw for different models
@@ -246,6 +255,39 @@ def preprocessCCS(dataset_folder):
 
   return X, y
 
+# Returns the objective value for the L2 objective 
+# function 1/2n ||Xw - y||^2 = 1/2n(Xw - y)ᵀ(Xw - y)
+def linearRegL2Obj(w, X, y):
+
+  # flattens y to be a 1D array to ensure correct matrix operations
+  y_flat = y.flatten()
+  residuals = X @ w - y_flat
+  return (1/(2*y_flat.shape[0])) * residuals.T @ residuals
+
+# Returns a d x 1 vector representing the gradient, using the formula
+# 1/n Xᵀ(Xw - y)
+def linearRegL2Grad(w, X, y):
+  
+  # flattens y to be a 1D array to ensure correct matrix operations
+  y_flat = y.flatten()
+  residuals = (X @ w) - y_flat
+  return (1/y_flat.shape[0]) * X.T @ residuals
+
+# Uses the Indirect approach to find the optimal w vector weights
+def find_opt(obj_func, grad_func, X, y):
+  d = X.shape[1]
+  # Initialize a random 1-D array of parameters of size d
+  w_0 = np.random.randn(d) 
+  
+  # Define an objective function `func` that takes a single argument (w)
+  func = lambda w: obj_func(w, X, y)
+
+  # Define a gradient function `gd` that takes a single argument (w)
+  gd = lambda w: grad_func(w, X, y)
+
+  return minimize(func, w_0, jac=gd)['x'][:, None]
+
+
 def logisticRegObj(w, X, y):
   # TODO: Implement logistic regression objective
   pass
@@ -256,6 +298,3 @@ def logisticRegGrad(w, X, y):
   pass
 
 
-def find_opt(obj_func, grad_func, X, y):
-  # TODO: Implement optimization routine
-  pass
