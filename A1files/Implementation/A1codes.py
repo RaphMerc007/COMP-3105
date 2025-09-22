@@ -115,7 +115,7 @@ def synRegExperiments():
 
     # print("weights from find_opt:", w_opt.flatten()) 
 
-    # w_Linf = minimizeLinf(Xtrain, ytrain)
+    w_Linf = minimizeLinf(Xtrain, ytrain)
   
     # Get train data loss
     # Get Xw for different models
@@ -287,14 +287,31 @@ def find_opt(obj_func, grad_func, X, y):
 
   return minimize(func, w_0, jac=gd)['x'][:, None]
 
-
 def logisticRegObj(w, X, y):
   # TODO: Implement logistic regression objective
-  pass
+
+  y_flat = y.flatten()
+  n = y_flat.shape[0]
+  ones_vector = np.ones(n)
+
+  # Solve sigmoid function σ(Xw) 
+  # sigmoid = 1 / (1 + np.exp(-(X @ w)))
+  sigmoid = np.exp(-np.logaddexp(0, - (X @ w)))
+
+  # -yT log(sigma (Xw)) - (1n -y)T log(1n - sigma(Xw))
+  term1 = -y_flat.T @ np.log(sigmoid)
+  term2 = (ones_vector - y_flat).T @ np.log(ones_vector - sigmoid)
+
+  return (1/n) * (term1 - term2)
 
 
 def logisticRegGrad(w, X, y):
   # TODO: Implement logistic regression gradient
-  pass
+
+  y_flat = y.flatten()
+  sigmoid = np.exp(-np.logaddexp(0, - (X @ w)))
+
+  return (1/y_flat.shape[0]) * X.T @ (sigmoid - y_flat)
+
 
 
