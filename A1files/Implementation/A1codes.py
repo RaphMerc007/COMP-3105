@@ -367,27 +367,13 @@ def synClsExperiments():
       train_acc[r, i, 1], test_acc[r, i, 1] = runClsExp(dim1=dim1)
     for i, dim2 in enumerate((1, 2, 4, 8)):
       train_acc[r, i, 2], test_acc[r, i, 2] = runClsExp(dim2=dim2)
-  # TODO: compute the average accuracies over runs
-
-
+  
+  # compute the average accuracies over runs, across dimension 0 (r, the # of runs)
+  train_avg_acc = np.mean(train_acc, axis=0)
+  test_avg_acc = np.mean(test_acc, axis=0)
 
   #return a 4-by-3 training accuracy variable and a 4-by-3 test accuracy variable
-  return train_acc, test_acc
-
-   # compute average losses for training data
-  # train_avg_loss = np.zeros([2,2])
-  # train_avg_loss[0,0] = np.sum(train_loss[:,0,0])/n_runs
-  # train_avg_loss[0,1] = np.sum(train_loss[:,0,1])/n_runs
-  # train_avg_loss[1,0] = np.sum(train_loss[:,1,0])/n_runs
-  # train_avg_loss[1,1] = np.sum(train_loss[:,1,1])/n_runs
-  
-  # # compute average losses for test data
-  # test_avg_loss = np.zeros([2,2])
-  # test_avg_loss[0,0] = np.sum(test_loss[:,0,0])/n_runs
-  # test_avg_loss[0,1] = np.sum(test_loss[:,0,1])/n_runs
-  # test_avg_loss[1,0] = np.sum(test_loss[:,1,0])/n_runs
-  # test_avg_loss[1,1] = np.sum(test_loss[:,1,1])/n_runs
-
+  return train_avg_acc, test_avg_acc
 
 # def preprocessBCW(dataset_folder):
 
