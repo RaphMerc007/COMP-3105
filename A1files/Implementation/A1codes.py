@@ -337,17 +337,29 @@ def synClsExperiments():
     Xtrain, ytrain = genData(m, dim1, dim2)
     Xtest, ytest = genData(n_test, dim1, dim2)
     w_logit = find_opt(logisticRegObj, logisticRegGrad, Xtrain, ytrain)
-    # ytrain_hat = # TODO: Compute predicted labels of the training points
-    # train_acc = # TODO: Compute the accuarcy of the training set
-    # ytest_hat = # TODO: Compute predicted labels of the test points
-    # test_acc = # TODO: Compute the accuarcy of the test set
+    # ytrain_hat = sigmoid(XTrain^T * w_logit) 
+    # Compute predicted labels of the training points
+    ytrain_hat = np.exp(-np.logaddexp(0, -(Xtrain @ w_logit)))
+
+    # train_acc = Compute the accuarcy of the training set
+    # Convert ytrain_hat values to 1 if probability >= 0, else 0
+    ytrain_hat_bool = (ytrain_hat >= 0.5).astype(int)
+    train_acc = np.mean(ytrain_hat_bool.flatten() == ytrain.flatten())
+
+    # ytest_hat = Compute predicted labels of the test points
+    ytest_hat = np.exp(-np.logaddexp(0, -(Xtest @ w_logit)))
+
+    # test_acc = Compute the accuarcy of the test set
+    ytest_hat_bool = (ytest_hat >= 0.5).astype(int)
+    test_acc = np.mean(ytest_hat_bool.flatten() == ytest.flatten())
+
     return train_acc, test_acc
   
   n_runs = 100
   train_acc = np.zeros([n_runs, 4, 3])
   test_acc = np.zeros([n_runs, 4, 3])
-  # TODO: Change the following random seed to one of your student IDs
-  np.random.seed(42)
+  # Change the following random seed to one of your student IDs
+  np.random.seed(101258669)
   for r in range(n_runs):
     for i, m in enumerate((10, 50, 100, 200)):
       train_acc[r, i, 0], test_acc[r, i, 0] = runClsExp(m=m)
@@ -356,35 +368,51 @@ def synClsExperiments():
     for i, dim2 in enumerate((1, 2, 4, 8)):
       train_acc[r, i, 2], test_acc[r, i, 2] = runClsExp(dim2=dim2)
   # TODO: compute the average accuracies over runs
-  # TODO: return a 4-by-3 training accuracy variable and a 4-by-3 test accuracy variable
-
-  return 1 # placeholder
 
 
-def preprocessBCW(dataset_folder):
 
-  # TODO: implement function 
+  #return a 4-by-3 training accuracy variable and a 4-by-3 test accuracy variable
+  return train_acc, test_acc
 
-  pass
+   # compute average losses for training data
+  # train_avg_loss = np.zeros([2,2])
+  # train_avg_loss[0,0] = np.sum(train_loss[:,0,0])/n_runs
+  # train_avg_loss[0,1] = np.sum(train_loss[:,0,1])/n_runs
+  # train_avg_loss[1,0] = np.sum(train_loss[:,1,0])/n_runs
+  # train_avg_loss[1,1] = np.sum(train_loss[:,1,1])/n_runs
+  
+  # # compute average losses for test data
+  # test_avg_loss = np.zeros([2,2])
+  # test_avg_loss[0,0] = np.sum(test_loss[:,0,0])/n_runs
+  # test_avg_loss[0,1] = np.sum(test_loss[:,0,1])/n_runs
+  # test_avg_loss[1,0] = np.sum(test_loss[:,1,0])/n_runs
+  # test_avg_loss[1,1] = np.sum(test_loss[:,1,1])/n_runs
 
-def runBCW(dataset_folder):
-  X, y = preprocessBCW(dataset_folder)
-  n, d = X.shape
-  X = np.concatenate((np.ones((n, 1)), X), axis=1) # augment
-  n_runs = 100
-  train_acc = np.zeros([n_runs])
-  test_acc = np.zeros([n_runs])
-  # TODO: Change the following random seed to one of your student IDs
-  np.random.seed(42)
-  for r in range(n_runs):
-  # TODO: Randomly partition the dataset into two parts (50%
-  # training and 50% test)
-  w = find_opt(logisticRegObj, logisticRegGrad, Xtrain, ytrain)
-  # TODO: Evaluate the model's accuracy on the training
-  # data. Save it to `train_acc`
-  # TODO: Evaluate the model's accuracy on the test
-  # data. Save it to `test_acc`
-  # TODO: compute the average accuracies over runs
-  # TODO: return two variables: the average training accuracy and average test accuracy
 
-  pass
+# def preprocessBCW(dataset_folder):
+
+#   # TODO: implement function 
+
+#   pass
+
+# def runBCW(dataset_folder):
+#   X, y = preprocessBCW(dataset_folder)
+#   n, d = X.shape
+#   X = np.concatenate((np.ones((n, 1)), X), axis=1) # augment
+#   n_runs = 100
+#   train_acc = np.zeros([n_runs])
+#   test_acc = np.zeros([n_runs])
+#   # TODO: Change the following random seed to one of your student IDs
+#   np.random.seed(42)
+#   for r in range(n_runs):
+#   # TODO: Randomly partition the dataset into two parts (50%
+#   # training and 50% test)
+#   w = find_opt(logisticRegObj, logisticRegGrad, Xtrain, ytrain)
+#   # TODO: Evaluate the model's accuracy on the training
+#   # data. Save it to `train_acc`
+#   # TODO: Evaluate the model's accuracy on the test
+#   # data. Save it to `test_acc`
+#   # TODO: compute the average accuracies over runs
+#   # TODO: return two variables: the average training accuracy and average test accuracy
+
+#   pass
