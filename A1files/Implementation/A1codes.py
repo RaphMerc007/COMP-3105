@@ -329,6 +329,30 @@ def synClsExperiments():
     y = np.concatenate([np.zeros([n_points, 1]), np.ones([n_points, 1])], axis=0)
     return X, y
 
+  def load_csv_data(train_path, test_path):
+    """
+    Load data from CSV files for classification
+    """
+    import pandas as pd
+
+    # Load training data
+    train_df = pd.read_csv(train_path)
+    Xtrain = train_df[['x1', 'x2']].values  
+    ytrain = train_df[['y']].values        
+
+    # Add bias term (column of ones) to Xtrain
+    Xtrain = np.concatenate((np.ones((Xtrain.shape[0], 1)), Xtrain), axis=1)
+
+    # Load test data
+    test_df = pd.read_csv(test_path)
+    Xtest = test_df[['x1', 'x2']].values  
+    ytest = test_df[['y']].values         
+
+    # Add bias term (column of ones) to Xtest
+    Xtest = np.concatenate((np.ones((Xtest.shape[0], 1)), Xtest), axis=1)
+
+    return Xtrain, ytrain, Xtest, ytest
+
   def runClsExp(m=100, dim1=2, dim2=2):
     '''
     Run classification experiment with the specified arguments
@@ -336,7 +360,15 @@ def synClsExperiments():
     n_test = 1000
     Xtrain, ytrain = genData(m, dim1, dim2)
     Xtest, ytest = genData(n_test, dim1, dim2)
+
+    # Using the toy data that was given
+    # Xtrain, ytrain, Xtest, ytest  = load_csv_data("./toy_data/classification_train.csv","./toy_data/classification_test.csv")
+
     w_logit = find_opt(logisticRegObj, logisticRegGrad, Xtrain, ytrain)
+
+    # print estimated w weights (only use for debug, this spams the console lmao)
+    # print("weights from find_opt ", w_logit.flatten())
+
     # ytrain_hat = sigmoid(XTrain^T * w_logit) 
     # Compute predicted labels of the training points
     ytrain_hat = np.exp(-np.logaddexp(0, -(Xtrain @ w_logit)))

@@ -80,6 +80,12 @@ def _plotCls():
   plt.legend()
   plt.show()
 
+  # test synthetic experiments
+  train_loss, test_loss = A1codes.synClsExperiments()
+  print("Losses:")
+  print(train_loss)
+  print(test_loss)
+
 
 if __name__ == "__main__":
 
