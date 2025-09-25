@@ -293,23 +293,30 @@ def logisticRegObj(w, X, y):
   y_flat = y.flatten()
   n = y_flat.shape[0]
   ones_vector = np.ones(n)
+  # Use logaddexp for numerical stability - work directly in log space
+  z = X @ w
+  
+  # log(sigmoid(z)) = -logaddexp(0, -z)
+  log_sigmoid = -np.logaddexp(0, -z)
+  
+  # log(1 - sigmoid(z)) = -z - logaddexp(0, -z) = -logaddexp(z, 0)
+  log_one_minus_sigmoid = -np.logaddexp(z, 0)
+  
+  # Logistic loss: -y*log(sigmoid) - (1-y)*log(1-sigmoid)
+  term1 = -y_flat.T @ log_sigmoid
+  term2 = -(ones_vector - y_flat).T @ log_one_minus_sigmoid
 
-  # Solve sigmoid function σ(Xw) 
-  # sigmoid = 1 / (1 + np.exp(-(X @ w)))
-  sigmoid = np.exp(-np.logaddexp(0, - (X @ w)))
-
-  # -yT log(sigma (Xw)) - (1n -y)T log(1n - sigma(Xw))
-  term1 = -y_flat.T @ np.log(sigmoid)
-  term2 = (ones_vector - y_flat).T @ np.log(ones_vector - sigmoid)
-
-  return (1/n) * (term1 - term2)
+  return (1/n) * (term1 + term2)
 
 
 def logisticRegGrad(w, X, y):
   # TODO: Implement logistic regression gradient
 
   y_flat = y.flatten()
-  sigmoid = np.exp(-np.logaddexp(0, - (X @ w)))
+  z = X @ w
+  
+  # For gradient, we need actual sigmoid values, use stable computation
+  sigmoid = np.exp(-np.logaddexp(0, -z))
 
   return (1/y_flat.shape[0]) * X.T @ (sigmoid - y_flat)
 
@@ -406,6 +413,17 @@ def synClsExperiments():
 
   #return a 4-by-3 training accuracy variable and a 4-by-3 test accuracy variable
   return train_avg_acc, test_avg_acc
+
+
+
+
+
+
+
+
+
+
+
 
 # def preprocessBCW(dataset_folder):
 
