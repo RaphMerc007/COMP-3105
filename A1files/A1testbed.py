@@ -40,7 +40,7 @@ def _plotReg():
   print(train_loss)
   print(test_loss)
   
-  train_loss, test_loss = A1codes.runCCS("./concrete+compressive+strength")
+  train_loss, test_loss = A1codes.runCCS("./A1files/concrete+compressive+strength")
   print("Real world test:")
   print("Training data:")
   print("           | L2 loss              | Linf loss")
@@ -87,7 +87,7 @@ def _plotCls():
   print(test_acc)
 
   # test real world data
-  train_acc, test_acc = A1codes.runBCW("./breast+cancer+wisconsin+diagnostic")
+  train_acc, test_acc = A1codes.runBCW("./A1files/breast+cancer+wisconsin+diagnostic")
   print("real world accuracy: ")
   print("Training data:", train_acc)
   print("Test accuracy:", test_acc)
