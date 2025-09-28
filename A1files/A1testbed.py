@@ -88,7 +88,7 @@ def _plotCls():
 
   # test real world data
   train_acc, test_acc = A1codes.runBCW("./breast+cancer+wisconsin+diagnostic")
-  print("real world losses: ")
+  print("real world accuracy: ")
   print("Training data:", train_acc)
   print("Test accuracy:", test_acc)
 
