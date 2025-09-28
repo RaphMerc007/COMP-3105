@@ -81,10 +81,16 @@ def _plotCls():
   plt.show()
 
   # test synthetic experiments
-  train_loss, test_loss = A1codes.synClsExperiments()
-  print("Losses:")
-  print(train_loss)
-  print(test_loss)
+  train_acc, test_acc = A1codes.synClsExperiments()
+  print("Accuracy:")
+  print(train_acc)
+  print(test_acc)
+
+  # test real world data
+  train_acc, test_acc = A1codes.runBCW("./breast+cancer+wisconsin+diagnostic")
+  print("real world losses: ")
+  print("Training data:", train_acc)
+  print("Test accuracy:", test_acc)
 
 
 if __name__ == "__main__":

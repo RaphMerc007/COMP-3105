@@ -414,41 +414,61 @@ def synClsExperiments():
   #return a 4-by-3 training accuracy variable and a 4-by-3 test accuracy variable
   return train_avg_acc, test_avg_acc
 
+# Extracts data from the wdbc.data data file containing breast cancer diagnosis info 
+def preprocessBCW(dataset_folder):
 
+  # Construct path to the data file
+  data_path = os.path.join(dataset_folder, 'wdbc.data')
 
+  # Load the data file 
+  df = pd.read_csv(data_path, header=None)
 
+  # Extarct 2nd column, representing our (n x 1) Y vector values, then convert the target variable
+  # to binary values (B to 0, M to 1)
+  y = df.iloc[: , 1].values 
+  y = np.where(y == 'B', 0, 1)
 
+  # Extract all columns following the 2nd column, representing the (n x d) X matrix values
+  X = df.iloc[:, 2:].values
 
+  return X, y
 
+def runBCW(dataset_folder):
+  X, y = preprocessBCW(dataset_folder)
+  n, d = X.shape
+  X = np.concatenate((np.ones((n, 1)), X), axis=1) # augment
+  n_runs = 100
+  train_acc = np.zeros([n_runs])
+  test_acc = np.zeros([n_runs])
+  # Change the following random seed to one of your student IDs
+  np.random.seed(101258669)
+  for r in range(n_runs):
+    # Randomly partition the dataset into two parts (50% training and 50% test)
 
+    # Get the length of the dataset and shuffle the length to get random indices
+    n = X.shape[0]
+    random_indices = np.random.permutation(n)
 
+    # Split the random indices in halves, then use them to populate the training and test sets respectively for both X and y
+    split_index = n // 2
+    Xtrain, Xtest = X[random_indices[:split_index]], X[random_indices[split_index:]]
+    ytrain, ytest = y[random_indices[:split_index]], y[random_indices[split_index:]]
 
+    w = find_opt(logisticRegObj, logisticRegGrad, Xtrain, ytrain)
 
+    # Evaluate the model's accuracy on the training data. Save it to `train_acc`
+    # Get the y_hat predictions for the training data, convert them to binary values (1 if greater than 0.5, else 0)
+    ytrain_hat = np.exp(-np.logaddexp(0, -(Xtrain @ w)))
+    ytrain_hat_bool = (ytrain_hat >= 0.5).astype(int)
+    train_acc[r] = np.mean(ytrain_hat_bool.flatten() == ytrain.flatten())
 
-# def preprocessBCW(dataset_folder):
+    # Evaluate the model's accuracy on the test data. Save it to `test_acc`
+    ytest_hat = np.exp(-np.logaddexp(0, -(Xtest @ w)))
+    ytest_hat_bool = (ytest_hat >= 0.5).astype(int)
+    test_acc[r] = np.mean(ytest_hat_bool.flatten() == ytest.flatten())
 
-#   # TODO: implement function 
+  # TODO: compute the average accuracies over runs
+  # TODO: return two variables: the average training accuracy and average test accuracy
 
-#   pass
+  return np.mean(train_acc), np.mean(test_acc)
 
-# def runBCW(dataset_folder):
-#   X, y = preprocessBCW(dataset_folder)
-#   n, d = X.shape
-#   X = np.concatenate((np.ones((n, 1)), X), axis=1) # augment
-#   n_runs = 100
-#   train_acc = np.zeros([n_runs])
-#   test_acc = np.zeros([n_runs])
-#   # TODO: Change the following random seed to one of your student IDs
-#   np.random.seed(42)
-#   for r in range(n_runs):
-#   # TODO: Randomly partition the dataset into two parts (50%
-#   # training and 50% test)
-#   w = find_opt(logisticRegObj, logisticRegGrad, Xtrain, ytrain)
-#   # TODO: Evaluate the model's accuracy on the training
-#   # data. Save it to `train_acc`
-#   # TODO: Evaluate the model's accuracy on the test
-#   # data. Save it to `test_acc`
-#   # TODO: compute the average accuracies over runs
-#   # TODO: return two variables: the average training accuracy and average test accuracy
-
-#   pass
