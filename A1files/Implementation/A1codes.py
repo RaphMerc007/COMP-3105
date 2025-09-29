@@ -288,7 +288,7 @@ def find_opt(obj_func, grad_func, X, y):
   return minimize(func, w_0, jac=gd)['x'][:, None]
 
 def logisticRegObj(w, X, y):
-  # TODO: Implement logistic regression objective
+  # Implement logistic regression objective
 
   y_flat = y.flatten()
   n = y_flat.shape[0]
@@ -310,7 +310,7 @@ def logisticRegObj(w, X, y):
 
 
 def logisticRegGrad(w, X, y):
-  # TODO: Implement logistic regression gradient
+  # Implement logistic regression gradient
 
   y_flat = y.flatten()
   z = X @ w
@@ -467,8 +467,6 @@ def runBCW(dataset_folder):
     ytest_hat_bool = (ytest_hat >= 0.5).astype(int)
     test_acc[r] = np.mean(ytest_hat_bool.flatten() == ytest.flatten())
 
-  # TODO: compute the average accuracies over runs
-  # TODO: return two variables: the average training accuracy and average test accuracy
-
+  # return two variables: the average training accuracy and average test accuracy
   return np.mean(train_acc), np.mean(test_acc)
 
