@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import os 
 
-#Q1 A
+#Q1 A TODO: Verify that this function retuns the correct value, in particular the margin calculation
 def minExpLinear(X, y, lamb):
 
     # Get # of elements and "features"
@@ -41,6 +41,65 @@ def minExpLinear(X, y, lamb):
 
     # Return weights and scalar intercept corresponding to the solution
     return w, w0
+
+#Q1 B
+def minHinge(X, y, lamb, stablizer=1e-5):
+
+    # Get # of elements and "features" and then get the diagonal matrix diag Y
+    n = X.shape[0]
+    d = X.shape[1]
+    Y = np.diag(y.flatten())
+
+    #Create the q vector consisting of (d+1) zeroes and n ones
+    q1 = np.zeros(d+1)
+    q2 = np.ones(n)
+    q = np.concatenate([q1, q2])
+
+    #Solve the first constraint parts G1 and h1: G11 = 0n×d , G12 = 0n×1, G13 = −In and h1 = 0n
+    G11 = np.zeros((n, d))
+    G12 = np.zeros((n, 1))
+    G13 = -np.eye(n)
+    h1 = np.zeros((n, 1))
+    G1 = np.concatenate([G11, G12, G13], axis = 1)
+
+    #Solve the second constraint parts G2 and h2: G21 = −∆(y)X , G22 = −∆(y)1n = −y, G23 = −In and h2 = −1n
+    G21 = -Y @ X 
+    G22 = -y
+    G23 = -np.eye(n)
+    h2 = -np.ones((n, 1))
+    G2 = np.concatenate([G21, G22, G23], axis = 1)
+
+    # put together G and h
+    G = np.concatenate([G1, G2], axis = 0)
+    h = np.concatenate([h1, h2], axis = 0)
+
+    # put together P where P11 = λId , everything else is 0
+    P11 = lamb * np.eye(d)
+    P12and3 = np.zeros((d, n + 1))
+    P1 = np.concatenate([P11, P12and3], axis = 1)
+    P2 = np.zeros((1, n + d + 1))
+    P3 = np.zeros((n, n + d + 1))
+
+    # Add small positive stabilizer to the diagonal to ensure numerical stability for the P matrix
+    P = np.concatenate([P1, P2, P3], axis = 0)
+    P = P + stablizer * np.eye(n+d+1)
+
+    # Convert P, q, G and H to cvxopt matrices
+    P = matrix(P)
+    q = matrix(q)
+    G = matrix(G)
+    h = matrix(h)
+
+    # solve
+    solution = solvers.qp(P, q, G, h)
+
+    # convert cvxopt matrix to array
+    arr = np.array(solution['x']).flatten()
+
+    # extract w (first d elements) and w0 (the d + 1 th element in the array)
+    return arr[:d], arr[d]
+
+
 
 def adjExpLinear(X, y, lamb, kernel_func):
   K = kernel_func(X,X)
