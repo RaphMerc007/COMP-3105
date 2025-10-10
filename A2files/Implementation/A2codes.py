@@ -99,3 +99,30 @@ def minHinge(X, y, lamb, stablizer=1e-5):
     # extract w (first d elements) and w0 (the d + 1 th element in the array)
     return arr[:d], arr[d]
 
+
+
+def adjExpLinear(X, y, lamb, kernel_func):
+  K = kernel_func(X,X)
+  n, d = X.shape
+
+  def loss(params):
+    a = params[:-1]
+    a0 = params[-1]
+
+    sum = 0
+    for i in range(n):
+      m = y * (K[:i].T @ a + a0)
+      sum += np.max(0, -m) + np.e**(np.min(0,-m))
+
+    regularization = (lamb / 2) * a.T @ K @ a
+    
+    return sum + regularization
+
+  x0 = np.zeros(n+1)
+
+  result = minimize(loss, x0)
+
+  a_star = result.x[:-1]
+  a0_star = result.x[-1]
+  
+  return a_star, a0_star
