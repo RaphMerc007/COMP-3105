@@ -158,6 +158,14 @@ def synExperimentsRegularize():
   return trainAcc, testAcc
 
 
+
+
+
+
+
+
+
+# q2 a
 def adjExpLinear(X, y, lamb, kernel_func):
   K = kernel_func(X,X)
   n, d = X.shape
@@ -183,3 +191,47 @@ def adjExpLinear(X, y, lamb, kernel_func):
   a0_star = result.x[-1]
   
   return a_star, a0_star
+
+# q2 b
+def adjHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
+  n,d = X.shape
+
+  return
+
+# q2 c
+def adjClassify(Xtest, a, a0, X, kernel_func):
+  return
+
+# q2 d
+def synExperimentsKernel():
+  n_runs = 10
+  n_train = 100
+  n_test = 1000
+  lamb = 0.001
+  kernel_list = [linearKernel,
+                lambda X1, X2: polyKernel(X1, X2, 2),
+                lambda X1, X2: polyKernel(X1, X2, 3),
+                lambda X1, X2: gaussKernel(X1, X2, 1.0),
+                lambda X1, X2: gaussKernel(X1, X2, 0.5)]
+  gen_model_list = [1, 2, 3]
+  train_acc_explinear = np.zeros([len(kernel_list), len(gen_model_list), n_runs])
+  test_acc_explinear = np.zeros([len(kernel_list), len(gen_model_list), n_runs])
+  train_acc_hinge = np.zeros([len(kernel_list), len(gen_model_list), n_runs])
+  test_acc_hinge = np.zeros([len(kernel_list), len(gen_model_list), n_runs])
+  # TODO: Change the following random seed to your GROUP ID
+  np.random.seed(0)
+  for r in range(n_runs):
+    for i, kernel in enumerate(kernel_list):
+      for j, gen_model in enumerate(gen_model_list):
+        Xtrain, ytrain = generateData(n=n_train, gen_model=gen_model)
+        Xtest, ytest = generateData(n=n_test, gen_model=gen_model)
+        a, a0 = adjExpLinear(Xtrain, ytrain, lamb, kernel)
+        # train_acc_explinear[i, j, r] = # TODO: compute accuracy on training set
+        # test_acc_explinear[i, j, r] = # TODO: compute accuracy on test set
+        a, a0 = adjHinge(Xtrain, ytrain, lamb, kernel)
+        # train_acc_hinge[i, j, r] = # TODO: compute accuracy on training set
+        # test_acc_hinge[i, j, r] = # TODO: compute accuracy on test set
+
+  # TODO: compute the average accuracies over runs
+  # TODO: combine accuracies (explinear and hinge)
+  # TODO: return 5-by-6 train accuracy and 5-by-6 test accuracy
