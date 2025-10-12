@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import os 
 
-#Q1 A TODO: Verify that this function retuns the correct value, in particular the margin calculation
+#Q1 A 
 def minExpLinear(X, y, lamb):
 
     # Get # of elements and "features"
@@ -23,7 +23,7 @@ def minExpLinear(X, y, lamb):
         w0 = params[-1]
 
         # Get the margin of the i-th data point  
-        margins = y * (X @ w + w0)
+        margins = y.flatten() * (X @ w + w0)
 
         # calculate and return loss
         term1 = np.maximum(0, -margins)

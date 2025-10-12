@@ -23,6 +23,9 @@ def _plotCls():
 	# Learn and plot results
 	# Primal
 	w, w0 = A2codes.minHinge(Xtrain, ytrain, lamb)
+	# w, w0 = A2codes.minExpLinear(Xtrain, ytrain, lamb)
+	print("weights", w, " bias ", w0)
+
 	plotModel(Xtrain, ytrain, w, w0, A2codes.classify)
 
 	#get tables for question 1 D and E
@@ -37,10 +40,10 @@ def _plotCls():
 	# a, b = A2codes.dualHinge(Xtrain, ytrain, lamb, kernel_func)
 	# plotDualModel(Xtrain, ytrain, a, b, lamb, kernel_func, A2codes.dualClassify)
 
-	# #TODO: remove after done testing q1 purposes below and uncomment lines above
-	# # -------------------------
-	# # 1. Create a small test dataset
-	# # -------------------------
+	# #TODO: (TINY TEST DATASET) remove after done testing q1 purposes below and uncomment lines above
+	# -------------------------
+	# 1. Create a small test dataset
+	# -------------------------
 	# X = np.array([
 	# 	[1, 2],
 	# 	[2, 3],
@@ -56,7 +59,9 @@ def _plotCls():
 	# # -------------------------
 	# # 2. Call your function
 	# # -------------------------
-	# w, w0 = A2codes.minHinge(X, y, lamb, stabilizer)
+	# # w, w0 = A2codes.minHinge(X, y, lamb, stabilizer)
+	# w, w0 = A2codes.minExpLinear(X, y, lamb)
+
 
 	# # -------------------------
 	# # 3. Print results
@@ -71,6 +76,10 @@ def _plotCls():
 	# preds = A2codes.classify(X, w, w0)
 	# print("\nPredictions:", preds)
 	# print("Accuracy:", np.mean(preds.flatten() == y.flatten()))
+
+	# #print graph
+	# plotModel(X, y, w, w0, A2codes.classify)
+
 
 
 
