@@ -99,6 +99,41 @@ def minHinge(X, y, lamb, stablizer=1e-5):
     # extract w (first d elements) and w0 (the d + 1 th element in the array)
     return arr[:d], arr[d]
 
+# Q1 C
+def classify(Xtest, w, w0):
+   
+   # returns the m x 1 prediction vector y-hat = sign(Xtest x w + w0) given an (m x d) test matrix Xtest
+   return np.sign(Xtest @ w + w0)
+
+# Q1 D
+# def synExperimentsRegularize():
+#   n_runs = 100
+#   n_train = 100
+#   n_test = 1000
+#   lamb_list = [0.001, 0.01, 0.1, 1.]
+#   gen_model_list = [1, 2, 3]
+#   train_acc_explinear = np.zeros([len(lamb_list), len(gen_model_list), n_runs])
+#   test_acc_explinear = np.zeros([len(lamb_list), len(gen_model_list), n_runs])
+#   train_acc_hinge = np.zeros([len(lamb_list), len(gen_model_list), n_runs])
+#   test_acc_hinge = np.zeros([len(lamb_list), len(gen_model_list), n_runs])
+#   # TODO: Change the following random seed to your GROUP ID
+#   np.random.seed(0)
+#   for r in range(n_runs):
+#     for i, lamb in enumerate(lamb_list):
+#       for j, gen_model in enumerate(gen_model_list):
+#         Xtrain, ytrain = generateData(n=n_train, gen_model=gen_model)
+#         Xtest, ytest = generateData(n=n_test, gen_model=gen_model)
+#         w, w0 = minExpLinear(Xtrain, ytrain, lamb)
+#         train_acc_explinear[i, j, r] = # TODO: compute accuracy on training set
+#         test_acc_explinear[i, j, r] = # TODO: compute accuracy on test set
+#         w, w0 = minHinge(Xtrain, ytrain, lamb)
+#         train_acc_hinge[i, j, r] = # TODO: compute accuracy on training set
+#         test_acc_hinge[i, j, r] = # TODO: compute accuracy on test set
+#   # TODO: compute the average accuracies over runs
+#   # TODO: combine accuracies (explinear and hinge)
+#   # TODO: return 4-by-6 train accuracy and 4-by-6 test accuracy
+
+#   return 0
 
 
 def adjExpLinear(X, y, lamb, kernel_func):
