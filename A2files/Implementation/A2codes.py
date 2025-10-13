@@ -3,10 +3,10 @@
 
 from cvxopt import matrix, solvers
 from scipy.optimize import minimize
-from A2helpers import generateData
 import numpy as np  
 import pandas as pd
 import os 
+from A2helpers import generateData, linearKernel, polyKernel, gaussKernel
 
 #Q1 A 
 def minExpLinear(X, y, lamb):
@@ -92,6 +92,7 @@ def minHinge(X, y, lamb, stablizer=1e-5):
     h = matrix(h)
 
     # solve
+    solvers.options['show_progress'] = False
     solution = solvers.qp(P, q, G, h)
 
     # convert cvxopt matrix to array
@@ -174,11 +175,11 @@ def adjExpLinear(X, y, lamb, kernel_func):
     a = params[:-1]
     a0 = params[-1]
 
-    sum = 0
-    for i in range(n):
-      m = y * (K[:i].T @ a + a0)
-      sum += np.max(0, -m) + np.e**(np.min(0,-m))
+    # Compute margins for all data points at once (vectorized)
+    margins = y.flatten() * (K @ a + a0)
 
+    # Calculate loss terms
+    sum = np.sum(np.maximum(0, -margins) + np.exp(np.minimum(0, -margins)))
     regularization = (lamb / 2) * a.T @ K @ a
     
     return sum + regularization
@@ -239,6 +240,7 @@ def adjHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
   h = matrix(h)
 
   # solve
+  solvers.options['show_progress'] = False
   solution = solvers.qp(P, q, G, h)
 
   # convert cvxopt matrix to array
@@ -268,20 +270,39 @@ def synExperimentsKernel():
   test_acc_explinear = np.zeros([len(kernel_list), len(gen_model_list), n_runs])
   train_acc_hinge = np.zeros([len(kernel_list), len(gen_model_list), n_runs])
   test_acc_hinge = np.zeros([len(kernel_list), len(gen_model_list), n_runs])
-  # TODO: Change the following random seed to your GROUP ID
-  np.random.seed(0)
+  np.random.seed(125)
   for r in range(n_runs):
     for i, kernel in enumerate(kernel_list):
       for j, gen_model in enumerate(gen_model_list):
         Xtrain, ytrain = generateData(n=n_train, gen_model=gen_model)
         Xtest, ytest = generateData(n=n_test, gen_model=gen_model)
-        a, a0 = adjExpLinear(Xtrain, ytrain, lamb, kernel)
-        # train_acc_explinear[i, j, r] = # TODO: compute accuracy on training set
-        # test_acc_explinear[i, j, r] = # TODO: compute accuracy on test set
-        a, a0 = adjHinge(Xtrain, ytrain, lamb, kernel)
-        # train_acc_hinge[i, j, r] = # TODO: compute accuracy on training set
-        # test_acc_hinge[i, j, r] = # TODO: compute accuracy on test set
 
-  # TODO: compute the average accuracies over runs
-  # TODO: combine accuracies (explinear and hinge)
-  # TODO: return 5-by-6 train accuracy and 5-by-6 test accuracy
+        
+        a, a0 = adjExpLinear(Xtrain, ytrain, lamb, kernel)
+
+        yHatTrain = adjClassify(Xtrain, a, a0, Xtrain, kernel)
+        yHatTest = adjClassify(Xtest, a, a0, Xtrain, kernel)
+
+        train_acc_explinear[i, j, r] = np.mean(yHatTrain.flatten() == ytrain.flatten())
+        test_acc_explinear[i, j, r] = np.mean(yHatTest.flatten() == ytest.flatten())
+
+
+        a, a0 = adjHinge(Xtrain, ytrain, lamb, kernel)
+
+        yHatTrain = adjClassify(Xtrain, a, a0, Xtrain, kernel)
+        yHatTest = adjClassify(Xtest, a, a0, Xtrain, kernel)
+
+        train_acc_hinge[i, j, r] = np.mean(yHatTrain.flatten() == ytrain.flatten())
+        test_acc_hinge[i, j, r] = np.mean(yHatTest.flatten() == ytest.flatten())
+
+  # compute the average accuracies over runs
+  trainAccExpLinear = np.mean(train_acc_explinear, axis = 2)
+  trainAccHinge = np.mean(train_acc_hinge, axis = 2)
+  testAccExpLinear = np.mean(test_acc_explinear, axis = 2)
+  testAccHinge = np.mean(test_acc_hinge, axis = 2)
+
+  # combine accuracies (explinear and hinge)
+  trainAcc = np.concatenate((trainAccExpLinear, trainAccHinge), axis = 1)
+  testAcc = np.concatenate((testAccExpLinear, testAccHinge), axis = 1)
+
+  return trainAcc, testAcc

@@ -30,12 +30,18 @@ def _plotCls():
 
 	#get tables for question 1 D and E
 	trainAcc, testAcc = A2codes.synExperimentsRegularize()
-	print("Accuracies:")
+	print("Regularized Accuracies:")
 	print(trainAcc)
 	print(testAcc)
 	# Adjoint
-	# a, a0 = A2codes.adjHinge(Xtrain, ytrain, lamb, kernel_func)
-	# plotAdjModel(Xtrain, ytrain, a, a0, kernel_func, A2codes.adjClassify)
+	a, a0 = A2codes.adjHinge(Xtrain, ytrain, lamb, kernel_func)
+	plotAdjModel(Xtrain, ytrain, a, a0, kernel_func, A2codes.adjClassify)
+
+	trainAcc, testAcc = A2codes.synExperimentsKernel()
+	print("Kernel Accuracies:")
+	print(trainAcc)
+	print(testAcc)
+
 	# # Dual
 	# a, b = A2codes.dualHinge(Xtrain, ytrain, lamb, kernel_func)
 	# plotDualModel(Xtrain, ytrain, a, b, lamb, kernel_func, A2codes.dualClassify)
