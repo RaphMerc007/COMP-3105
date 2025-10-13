@@ -166,7 +166,7 @@ def synExperimentsRegularize():
 
 
 
-# q2 a
+# q2 A
 def adjExpLinear(X, y, lamb, kernel_func):
   K = kernel_func(X,X)
   n, d = X.shape
@@ -193,7 +193,7 @@ def adjExpLinear(X, y, lamb, kernel_func):
   
   return a_star, a0_star
 
-# q2 b
+# q2 B
 def adjHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
   n,d = X.shape
   K = kernel_func(X,X)
@@ -249,12 +249,12 @@ def adjHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
   # extract a (first n elements) and a0 (the n + 1 th element in the array)
   return arr[:n], arr[n]
 
-# q2 c
+# q2 C
 def adjClassify(Xtest, a, a0, X, kernel_func):
   # returns the m x 1 prediction vector y-hat = sign(K(Xtest, X) @ a + a0) given an (m x d) test matrix Xtest
   return np.sign(kernel_func(Xtest, X) @ a + a0)
 
-# q2 d
+# q2 D
 def synExperimentsKernel():
   n_runs = 10
   n_train = 100
@@ -306,3 +306,102 @@ def synExperimentsKernel():
   testAcc = np.concatenate((testAccExpLinear, testAccHinge), axis = 1)
 
   return trainAcc, testAcc
+
+
+
+
+
+# q3 A
+def dualHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
+  n,d = X.shape
+  K = kernel_func(X, X)
+  Y = np.diag(y.flatten())
+
+  P = 1/lamb * Y @ K @ Y
+  P = P + stabilizer * np.eye(n)
+
+
+  q = -1 * np.ones((n, 1))
+
+  G1 = -1 * np.eye(n)
+  G2 = np.eye(n)
+
+  G = np.concatenate([G1, G2], axis = 0)
+  h1 = np.zeros((n, 1))
+  h2 = np.ones((n, 1))
+
+  h = np.concatenate([h1, h2], axis = 0)
+
+  A = y.T
+  b = np.ones((1, 1))
+
+  P = matrix(P)
+  q = matrix(q)
+  G = matrix(G)
+  h = matrix(h)
+  A = matrix(A)
+  b = matrix(b)
+
+
+  solvers.options['show_progress'] = False
+  solution = solvers.qp(P, q, G, h, A, b)
+
+  a = np.array(solution['x']).flatten()
+
+  # Compute b using the support vector closest to 0.5
+  support_vectors = (a > 1e-5) & (a < 1 - 1e-5)
+
+  # Find distances to 0.5
+  distances = np.abs(a - 0.5)
+  distances[~support_vectors] = np.inf  # Ignore non-support vectors
+
+  # Pick the best one
+  i = np.argmin(distances)
+
+  # Compute b = y_i - (1/λ) k_i^T Δ(y)α*
+  k_i = K[i, :]
+  b_offset = y[i, 0] - (1/lamb) * k_i @ Y @ a
+
+  return a, b_offset
+
+# q3 B
+def dualClassify(Xtest, a, b, X, y, lamb, kernel_func):
+  Y = np.diag(y.flatten())
+  return np.sign(1/lamb * kernel_func(Xtest, X) @ Y @ a + b)
+
+
+# q3 C
+def cvMnist(dataset_folder, lamb_list, kernel_list, k=5):
+  train_data = pd.read_csv(f"{dataset_folder}/A2train.csv", header=None).to_numpy()
+  X = train_data[:, 1:] / 255.
+  y = train_data[:, 0][:, None]
+  y[y == 4] = -1
+  y[y == 9] = 1
+  cv_acc = np.zeros([k, len(lamb_list), len(kernel_list)])
+  np.random.seed(12345689)
+  # TODO: perform any necessary setup
+  for i, lamb in enumerate(lamb_list):
+    for j, kernel_func in enumerate(kernel_list):
+      for l in range(k):
+        length = X.shape[0]//k
+        start = l * length
+        end = start + length
+        
+        Xval = X[start:end,:]
+        yval = y[start:end,:]
+
+        Xtrain = np.concatenate([X[:start,:], X[end:,:]], axis = 0)
+        ytrain = np.concatenate([y[:start,:], y[end:,:]], axis = 0)
+
+        a, b = dualHinge(Xtrain, ytrain, lamb, kernel_func)
+        yhat = dualClassify(Xval, a, b, Xtrain, ytrain, lamb, kernel_func)
+        cv_acc[l, i, j] = np.mean(yhat.flatten() == yval.flatten())
+        
+  cv_acc = np.mean(cv_acc, axis = 0)
+
+  best_idx = np.unravel_index(np.argmax(cv_acc), cv_acc.shape)
+
+  best_kernel = kernel_list[best_idx[1]]
+  best_lamb = lamb_list[best_idx[0]]
+
+  return cv_acc, best_lamb, best_kernel

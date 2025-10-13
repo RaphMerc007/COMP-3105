@@ -7,11 +7,10 @@
 import numpy as np
 
 import Implementation.A2codes as A2codes
-from A2helpers import plotModel, plotAdjModel, plotDualModel, polyKernel, generateData
+from A2helpers import plotModel, plotAdjModel, plotDualModel, polyKernel, generateData, plotDigit
 
 
 def _plotCls():
-
 	n = 100
 	lamb = 0.01
 	gen_model = 1
@@ -19,7 +18,6 @@ def _plotCls():
 
 	# Generate data
 	Xtrain, ytrain = generateData(n=n, gen_model=gen_model)
-
 	# Learn and plot results
 	# Primal
 	w, w0 = A2codes.minHinge(Xtrain, ytrain, lamb)
@@ -30,11 +28,14 @@ def _plotCls():
 
 	#get tables for question 1 D and E
 	trainAcc, testAcc = A2codes.synExperimentsRegularize()
+
 	print("Regularized Accuracies:")
 	print(trainAcc)
 	print(testAcc)
 	# Adjoint
 	a, a0 = A2codes.adjHinge(Xtrain, ytrain, lamb, kernel_func)
+	# a, a0 = A2codes.adjExpLinear(Xtrain, ytrain, lamb, kernel_func)
+
 	plotAdjModel(Xtrain, ytrain, a, a0, kernel_func, A2codes.adjClassify)
 
 	trainAcc, testAcc = A2codes.synExperimentsKernel()
@@ -42,12 +43,10 @@ def _plotCls():
 	print(trainAcc)
 	print(testAcc)
 
-	# # Dual
-	# a, b = A2codes.dualHinge(Xtrain, ytrain, lamb, kernel_func)
-	# plotDualModel(Xtrain, ytrain, a, b, lamb, kernel_func, A2codes.dualClassify)
+	# Dual
+	a, b = A2codes.dualHinge(Xtrain, ytrain, lamb, kernel_func)
+	plotDualModel(Xtrain, ytrain, a, b, lamb, kernel_func, A2codes.dualClassify)
 
-	# #TODO: (TINY TEST DATASET) remove after done testing q1 purposes below and uncomment lines above
-	# -------------------------
 	# 1. Create a small test dataset
 	# -------------------------
 	# X = np.array([
@@ -87,6 +86,52 @@ def _plotCls():
 	# plotModel(X, y, w, w0, A2codes.classify)
 
 
+def testMnist():
+  # FOCUSED TEST - Only best-performing hyperparameters
+  print("="*60)
+  print("FOCUSED TEST - Top performers only")
+  print("="*60)
+
+  # Only test the promising lambda values
+  lamb_list = [0.05, 0.1, 0.25, 0.5, 1.0]
+
+  # Only test the best kernels
+  kernel_list = []
+  kernel_names = []
+
+  # Linear (baseline)
+  kernel_list.append(A2codes.linearKernel)
+  kernel_names.append("Linear")
+
+  # Best Gaussian kernels only (σ = 4-8)
+  for width in [4.0, 5.0, 6.0, 7.0, 8.0]:
+      kernel_list.append(lambda X1, X2, w=width: A2codes.gaussKernel(X1, X2, w))
+      kernel_names.append(f"Gauss(σ={width})")
+
+  print(f"Testing {len(lamb_list)} lambdas × {len(kernel_list)} kernels = {len(lamb_list) * len(kernel_list)} combinations")
+  print(f"Kernels: {kernel_names}")
+
+  # Test with different seed
+  SEED = 42  # Change this to test with different data splits
+  cv_acc, best_lamb, best_kernel = A2codes.cvMnist(".", lamb_list, kernel_list, k=5, seed=SEED)
+
+  print(f"\nUsing seed: {SEED}")
+  print("\nCV Accuracies:")
+  print(cv_acc)
+
+  # Find and display results
+  best_idx = np.unravel_index(np.argmax(cv_acc), cv_acc.shape)
+  print(f"\nBest Lambda: {best_lamb}")
+  print(f"Best Kernel: {kernel_names[best_idx[1]]}")
+  print(f"Best Accuracy: {cv_acc[best_idx[0], best_idx[1]]:.4f}")
+
+  # Show top 5 combinations
+  flat_acc = cv_acc.flatten()
+  top5_indices = np.argsort(flat_acc)[-5:][::-1]
+  print("\nTop 5 combinations:")
+  for idx in top5_indices:
+    lamb_idx, kernel_idx = np.unravel_index(idx, cv_acc.shape)
+    print(f"  {kernel_names[kernel_idx]}, λ={lamb_list[lamb_idx]}: {cv_acc[lamb_idx, kernel_idx]:.4f}")	# -------------------------
 
 
 
@@ -94,3 +139,6 @@ def _plotCls():
 if __name__ == "__main__":
 
 	_plotCls()
+
+
+testMnist()
