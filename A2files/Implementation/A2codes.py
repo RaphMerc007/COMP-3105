@@ -249,7 +249,8 @@ def adjHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
 
 # q2 c
 def adjClassify(Xtest, a, a0, X, kernel_func):
-  return
+  # returns the m x 1 prediction vector y-hat = sign(K(Xtest, X) @ a + a0) given an (m x d) test matrix Xtest
+  return np.sign(kernel_func(Xtest, X) @ a + a0)
 
 # q2 d
 def synExperimentsKernel():
