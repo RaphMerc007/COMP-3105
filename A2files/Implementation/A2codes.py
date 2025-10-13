@@ -378,12 +378,12 @@ def cvMnist(dataset_folder, lamb_list, kernel_list, k=5):
   y[y == 4] = -1
   y[y == 9] = 1
   cv_acc = np.zeros([k, len(lamb_list), len(kernel_list)])
-  np.random.seed(12345689)
-  # TODO: perform any necessary setup
+  np.random.seed(125)
+  length = X.shape[0]//k
+  
   for i, lamb in enumerate(lamb_list):
     for j, kernel_func in enumerate(kernel_list):
       for l in range(k):
-        length = X.shape[0]//k
         start = l * length
         end = start + length
         
