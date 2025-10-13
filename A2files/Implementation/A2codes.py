@@ -117,7 +117,7 @@ def synExperimentsRegularize():
   test_acc_explinear = np.zeros([len(lamb_list), len(gen_model_list), n_runs])
   train_acc_hinge = np.zeros([len(lamb_list), len(gen_model_list), n_runs])
   test_acc_hinge = np.zeros([len(lamb_list), len(gen_model_list), n_runs])
-  np.random.seed(101258669)
+  np.random.seed(125)
   for r in range(n_runs):
     for i, lamb in enumerate(lamb_list):
       for j, gen_model in enumerate(gen_model_list):
