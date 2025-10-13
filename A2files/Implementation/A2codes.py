@@ -195,8 +195,57 @@ def adjExpLinear(X, y, lamb, kernel_func):
 # q2 b
 def adjHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
   n,d = X.shape
+  K = kernel_func(X,X)
+  Y = np.diag(y.flatten())
 
-  return
+  #Create the q vector consisting of (n+1) zeroes and n ones
+  q1 = np.zeros(n+1)
+  q2 = np.ones(n)
+  q = np.concatenate([q1, q2])
+
+  #Solve the first constraint parts G1 and h1: G11 = 0n×n , G12 = 0n×1, G13 = −In and h1 = 0n
+  G11 = np.zeros((n, n))
+  G12 = np.zeros((n, 1))
+  G13 = -np.eye(n)
+  h1 = np.zeros((n, 1))
+  G1 = np.concatenate([G11, G12, G13], axis = 1)
+
+  #Solve the second constraint parts G2 and h2: G21 = −∆(y)K , G22 = −∆(y)1n = −y, G23 = −In and h2 = −1n
+  G21 = -Y @ K
+  G22 = -y
+  G23 = -np.eye(n)
+  h2 = -np.ones((n, 1))
+  G2 = np.concatenate([G21, G22, G23], axis = 1)
+
+  # put together G and h
+  G = np.concatenate([G1, G2], axis = 0)
+  h = np.concatenate([h1, h2], axis = 0)
+
+  # put together P where P11 = λK , everything else is 0
+  P11 = lamb * K
+  P12and3 = np.zeros((n, n + 1))
+  P1 = np.concatenate([P11, P12and3], axis = 1)
+  P2 = np.zeros((1, 2*n + 1))
+  P3 = np.zeros((n, 2*n + 1))
+
+  # Add small positive stabilizer to the diagonal to ensure numerical stability for the P matrix
+  P = np.concatenate([P1, P2, P3], axis = 0)
+  P = P + stabilizer * np.eye(2*n+1)
+
+  # Convert P, q, G and H to cvxopt matrices
+  P = matrix(P)
+  q = matrix(q)
+  G = matrix(G)
+  h = matrix(h)
+
+  # solve
+  solution = solvers.qp(P, q, G, h)
+
+  # convert cvxopt matrix to array
+  arr = np.array(solution['x']).flatten()
+
+  # extract a (first n elements) and a0 (the n + 1 th element in the array)
+  return arr[:n], arr[n]
 
 # q2 c
 def adjClassify(Xtest, a, a0, X, kernel_func):
