@@ -5,7 +5,6 @@ from cvxopt import matrix, solvers
 from scipy.optimize import minimize
 import numpy as np  
 import pandas as pd
-import os 
 from A2helpers import generateData, linearKernel, polyKernel, gaussKernel
 
 #Q1 A 
@@ -159,35 +158,35 @@ def synExperimentsRegularize():
   return trainAcc, testAcc
 
 
-
-
-
-
-
-
-
 # q2 A
 def adjExpLinear(X, y, lamb, kernel_func):
+
+  # compute the kernel matrix
   K = kernel_func(X,X)
   n, d = X.shape
 
+  # define the loss function for the regularized ExpLinear loss
   def loss(params):
+    # extract the first n elements from the params representing weights, and remaining element as the intercept
     a = params[:-1]
     a0 = params[-1]
 
-    # Compute margins for all data points at once (vectorized)
+    # compute margins for all data points at once (vectorized)
     margins = y.flatten() * (K @ a + a0)
 
-    # Calculate loss terms
+    # calculate loss terms
     sum = np.sum(np.maximum(0, -margins) + np.exp(np.minimum(0, -margins)))
     regularization = (lamb / 2) * a.T @ K @ a
     
     return sum + regularization
 
+  # initialize a zero (n+1) x 1 vector storing the initial guess values
   x0 = np.zeros(n+1)
 
+  # solve
   result = minimize(loss, x0)
 
+  # extract results from the scipy minimize function
   a_star = result.x[:-1]
   a0_star = result.x[-1]
   
@@ -280,18 +279,23 @@ def synExperimentsKernel():
         
         a, a0 = adjExpLinear(Xtrain, ytrain, lamb, kernel)
 
+        # Get the y hat predictions for weights learned using the minExpLinear loss
         yHatTrain = adjClassify(Xtrain, a, a0, Xtrain, kernel)
         yHatTest = adjClassify(Xtest, a, a0, Xtrain, kernel)
 
+        # Computes accuracy on training and test sets respectively for the minExpLinear loss (flatten to ensure both arrays
+        # are the same and can be compared properly)
         train_acc_explinear[i, j, r] = np.mean(yHatTrain.flatten() == ytrain.flatten())
         test_acc_explinear[i, j, r] = np.mean(yHatTest.flatten() == ytest.flatten())
 
 
         a, a0 = adjHinge(Xtrain, ytrain, lamb, kernel)
 
+        # Get the y hat predictions for weights learned using the minHinge loss
         yHatTrain = adjClassify(Xtrain, a, a0, Xtrain, kernel)
         yHatTest = adjClassify(Xtest, a, a0, Xtrain, kernel)
 
+        #Computes accuracy on training and test sets respectively for the minHinge loss
         train_acc_hinge[i, j, r] = np.mean(yHatTrain.flatten() == ytrain.flatten())
         test_acc_hinge[i, j, r] = np.mean(yHatTest.flatten() == ytest.flatten())
 
@@ -317,24 +321,34 @@ def dualHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
   K = kernel_func(X, X)
   Y = np.diag(y.flatten())
 
+  # put together P where P = 1/λ * Y @ K @ Y
   P = 1/lamb * Y @ K @ Y
   P = P + stabilizer * np.eye(n)
 
 
+  # create the q vector consisting of n ones
   q = -1 * np.ones((n, 1))
 
+  # create the G1 matrix consisting of -In
   G1 = -1 * np.eye(n)
+  # create the G2 matrix consisting of In
   G2 = np.eye(n)
-
+  # put together G
   G = np.concatenate([G1, G2], axis = 0)
-  h1 = np.zeros((n, 1))
-  h2 = np.ones((n, 1))
 
+  # create the h1 vector consisting of 0n
+  h1 = np.zeros((n, 1))
+  # create the h2 vector consisting of 1n
+  h2 = np.ones((n, 1))
+  # put together h
   h = np.concatenate([h1, h2], axis = 0)
 
+  # create the A matrix consisting of y.T
   A = y.T
+  # create the b matrix consisting of 1
   b = np.ones((1, 1))
 
+  # convert to cvxopt matrices
   P = matrix(P)
   q = matrix(q)
   G = matrix(G)
@@ -342,20 +356,22 @@ def dualHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
   A = matrix(A)
   b = matrix(b)
 
-
+  # solve
   solvers.options['show_progress'] = False
   solution = solvers.qp(P, q, G, h, A, b)
 
+  # convert to array
   a = np.array(solution['x']).flatten()
 
   # Compute b using the support vector closest to 0.5
+  # create the support vectors
   support_vectors = (a > 1e-5) & (a < 1 - 1e-5)
 
-  # Find distances to 0.5
+  # find distances to 0.5
   distances = np.abs(a - 0.5)
   distances[~support_vectors] = np.inf  # Ignore non-support vectors
 
-  # Pick the best one
+  # pick the best one
   i = np.argmin(distances)
 
   # Compute b = y_i - (1/λ) k_i^T Δ(y)α*
@@ -367,6 +383,7 @@ def dualHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
 # q3 B
 def dualClassify(Xtest, a, b, X, y, lamb, kernel_func):
   Y = np.diag(y.flatten())
+  # returns the m x 1 prediction vector y-hat = sign(1/λ * K(Xtest, X) @ Y @ a + b) given an (m x d) test matrix Xtest
   return np.sign(1/lamb * kernel_func(Xtest, X) @ Y @ a + b)
 
 
@@ -384,23 +401,34 @@ def cvMnist(dataset_folder, lamb_list, kernel_list, k=5):
   for i, lamb in enumerate(lamb_list):
     for j, kernel_func in enumerate(kernel_list):
       for l in range(k):
+        # determine bounds for the validation set
         start = l * length
         end = start + length
         
+        # determine the validation set
         Xval = X[start:end,:]
         yval = y[start:end,:]
 
+        # determine the training set
         Xtrain = np.concatenate([X[:start,:], X[end:,:]], axis = 0)
         ytrain = np.concatenate([y[:start,:], y[end:,:]], axis = 0)
 
+        # determine the weights and bias
         a, b = dualHinge(Xtrain, ytrain, lamb, kernel_func)
+
+        # determine the predictions for the validation set
         yhat = dualClassify(Xval, a, b, Xtrain, ytrain, lamb, kernel_func)
+        
+        # determine the accuracy for the validation set
         cv_acc[l, i, j] = np.mean(yhat.flatten() == yval.flatten())
         
+  # determine the average accuracy for the validation set
   cv_acc = np.mean(cv_acc, axis = 0)
 
+  # determine the best kernel and lambda
   best_idx = np.unravel_index(np.argmax(cv_acc), cv_acc.shape)
 
+  # determine the best kernel and lambda
   best_kernel = kernel_list[best_idx[1]]
   best_lamb = lamb_list[best_idx[0]]
 

@@ -100,22 +100,21 @@ def testMnist():
   kernel_names = []
 
   # Linear (baseline)
-  kernel_list.append(A2codes.linearKernel)
-  kernel_names.append("Linear")
+  # kernel_list.append(A2codes.linearKernel)
+  # kernel_names.append("Linear")
 
   # Best Gaussian kernels only (σ = 4-8)
-  for width in [4.0, 5.0, 6.0, 7.0, 8.0]:
-      kernel_list.append(lambda X1, X2, w=width: A2codes.gaussKernel(X1, X2, w))
-      kernel_names.append(f"Gauss(σ={width})")
+  # for width in [4.0, 5.0, 6.0, 7.0, 8.0]:
+  d = 2
+  kernel_list.append(lambda X1, X2, d=2: A2codes.polyKernel(X1, X2, d))
+  kernel_names.append(f"Poly(d={d})")
 
   print(f"Testing {len(lamb_list)} lambdas × {len(kernel_list)} kernels = {len(lamb_list) * len(kernel_list)} combinations")
   print(f"Kernels: {kernel_names}")
 
   # Test with different seed
-  SEED = 42  # Change this to test with different data splits
-  cv_acc, best_lamb, best_kernel = A2codes.cvMnist(".", lamb_list, kernel_list, k=5, seed=SEED)
+  cv_acc, best_lamb, best_kernel = A2codes.cvMnist(".", lamb_list, kernel_list, k=5)
 
-  print(f"\nUsing seed: {SEED}")
   print("\nCV Accuracies:")
   print(cv_acc)
 
@@ -137,8 +136,8 @@ def testMnist():
 
 
 if __name__ == "__main__":
-
+  # testMnist()
+  
 	_plotCls()
 
 
-testMnist()
