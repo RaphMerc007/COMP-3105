@@ -103,7 +103,7 @@ def minHinge(X, y, lamb, stablizer=1e-5):
 # Q1 C
 def classify(Xtest, w, w0):
    # returns the m x 1 prediction vector y-hat = sign(Xtest x w + w0) given an (m x d) test matrix Xtest
-   return np.sign(Xtest @ w + w0)
+   return np.sign(Xtest @ w + w0).flatten()
 
 # Q1 D
 def synExperimentsRegularize():
@@ -129,10 +129,9 @@ def synExperimentsRegularize():
         yHatTrain = classify(Xtrain, w, w0)
         yHatTest = classify(Xtest, w, w0)
 
-        # Computes accuracy on training and test sets respectively for the minExpLinear loss (flatten to ensure both arrays
-        # are the same and can be compared properly)
-        train_acc_explinear[i, j, r] = np.mean(yHatTrain.flatten() == ytrain.flatten())
-        test_acc_explinear[i, j, r] = np.mean(yHatTest.flatten() == ytest.flatten())
+        # Computes accuracy on training and test sets respectively for the minExpLinear loss
+        train_acc_explinear[i, j, r] = np.mean(yHatTrain == ytrain.flatten())
+        test_acc_explinear[i, j, r] = np.mean(yHatTest == ytest.flatten())
         
         w, w0 = minHinge(Xtrain, ytrain, lamb)
 
@@ -141,8 +140,8 @@ def synExperimentsRegularize():
         yHatTest = classify(Xtest, w, w0)
 
         #Computes accuracy on training and test sets respectively for the minHinge loss
-        train_acc_hinge[i, j, r] = np.mean(yHatTrain.flatten() == ytrain.flatten())
-        test_acc_hinge[i, j, r] = np.mean(yHatTest.flatten() == ytest.flatten())
+        train_acc_hinge[i, j, r] = np.mean(yHatTrain == ytrain.flatten())
+        test_acc_hinge[i, j, r] = np.mean(yHatTest == ytest.flatten())
 
   # compute the average accuracies over runs
   trainAccExpLinear = np.mean(train_acc_explinear, axis = 2)
@@ -251,7 +250,7 @@ def adjHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
 # q2 C
 def adjClassify(Xtest, a, a0, X, kernel_func):
   # returns the m x 1 prediction vector y-hat = sign(K(Xtest, X) @ a + a0) given an (m x d) test matrix Xtest
-  return np.sign(kernel_func(Xtest, X) @ a + a0)
+  return np.sign(kernel_func(Xtest, X) @ a + a0).flatten()
 
 # q2 D
 def synExperimentsKernel():
@@ -275,7 +274,6 @@ def synExperimentsKernel():
       for j, gen_model in enumerate(gen_model_list):
         Xtrain, ytrain = generateData(n=n_train, gen_model=gen_model)
         Xtest, ytest = generateData(n=n_test, gen_model=gen_model)
-
         
         a, a0 = adjExpLinear(Xtrain, ytrain, lamb, kernel)
 
@@ -283,10 +281,9 @@ def synExperimentsKernel():
         yHatTrain = adjClassify(Xtrain, a, a0, Xtrain, kernel)
         yHatTest = adjClassify(Xtest, a, a0, Xtrain, kernel)
 
-        # Computes accuracy on training and test sets respectively for the minExpLinear loss (flatten to ensure both arrays
-        # are the same and can be compared properly)
-        train_acc_explinear[i, j, r] = np.mean(yHatTrain.flatten() == ytrain.flatten())
-        test_acc_explinear[i, j, r] = np.mean(yHatTest.flatten() == ytest.flatten())
+        # Computes accuracy on training and test sets respectively for the minExpLinear loss
+        train_acc_explinear[i, j, r] = np.mean(yHatTrain == ytrain.flatten())
+        test_acc_explinear[i, j, r] = np.mean(yHatTest == ytest.flatten())
 
 
         a, a0 = adjHinge(Xtrain, ytrain, lamb, kernel)
@@ -296,8 +293,8 @@ def synExperimentsKernel():
         yHatTest = adjClassify(Xtest, a, a0, Xtrain, kernel)
 
         #Computes accuracy on training and test sets respectively for the minHinge loss
-        train_acc_hinge[i, j, r] = np.mean(yHatTrain.flatten() == ytrain.flatten())
-        test_acc_hinge[i, j, r] = np.mean(yHatTest.flatten() == ytest.flatten())
+        train_acc_hinge[i, j, r] = np.mean(yHatTrain == ytrain.flatten())
+        test_acc_hinge[i, j, r] = np.mean(yHatTest == ytest.flatten())
 
   # compute the average accuracies over runs
   trainAccExpLinear = np.mean(train_acc_explinear, axis = 2)
@@ -384,7 +381,7 @@ def dualHinge(X, y, lamb, kernel_func, stabilizer=1e-5):
 def dualClassify(Xtest, a, b, X, y, lamb, kernel_func):
   Y = np.diag(y.flatten())
   # returns the m x 1 prediction vector y-hat = sign(1/λ * K(Xtest, X) @ Y @ a + b) given an (m x d) test matrix Xtest
-  return np.sign(1/lamb * kernel_func(Xtest, X) @ Y @ a + b)
+  return np.sign(1/lamb * kernel_func(Xtest, X) @ Y @ a + b).flatten()
 
 
 # q3 C
@@ -396,6 +393,8 @@ def cvMnist(dataset_folder, lamb_list, kernel_list, k=5):
   y[y == 9] = 1
   cv_acc = np.zeros([k, len(lamb_list), len(kernel_list)])
   np.random.seed(125)
+
+  # determine the length of 1 fold
   length = X.shape[0]//k
   
   for i, lamb in enumerate(lamb_list):
@@ -420,7 +419,7 @@ def cvMnist(dataset_folder, lamb_list, kernel_list, k=5):
         yhat = dualClassify(Xval, a, b, Xtrain, ytrain, lamb, kernel_func)
         
         # determine the accuracy for the validation set
-        cv_acc[l, i, j] = np.mean(yhat.flatten() == yval.flatten())
+        cv_acc[l, i, j] = np.mean(yhat == yval.flatten())
         
   # determine the average accuracy for the validation set
   cv_acc = np.mean(cv_acc, axis = 0)

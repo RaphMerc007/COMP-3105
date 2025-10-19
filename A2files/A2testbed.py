@@ -24,7 +24,7 @@ def _plotCls():
 	# w, w0 = A2codes.minExpLinear(Xtrain, ytrain, lamb)
 	print("weights", w, " bias ", w0)
 
-	plotModel(Xtrain, ytrain, w, w0, A2codes.classify)
+	# plotModel(Xtrain, ytrain, w, w0, A2codes.classify)
 
 	#get tables for question 1 D and E
 	trainAcc, testAcc = A2codes.synExperimentsRegularize()
@@ -36,7 +36,7 @@ def _plotCls():
 	a, a0 = A2codes.adjHinge(Xtrain, ytrain, lamb, kernel_func)
 	# a, a0 = A2codes.adjExpLinear(Xtrain, ytrain, lamb, kernel_func)
 
-	plotAdjModel(Xtrain, ytrain, a, a0, kernel_func, A2codes.adjClassify)
+	# plotAdjModel(Xtrain, ytrain, a, a0, kernel_func, A2codes.adjClassify)
 
 	trainAcc, testAcc = A2codes.synExperimentsKernel()
 	print("Kernel Accuracies:")
@@ -45,7 +45,7 @@ def _plotCls():
 
 	# Dual
 	a, b = A2codes.dualHinge(Xtrain, ytrain, lamb, kernel_func)
-	plotDualModel(Xtrain, ytrain, a, b, lamb, kernel_func, A2codes.dualClassify)
+	# plotDualModel(Xtrain, ytrain, a, b, lamb, kernel_func, A2codes.dualClassify)
 
 	# 1. Create a small test dataset
 	# -------------------------
@@ -104,10 +104,9 @@ def testMnist():
   # kernel_names.append("Linear")
 
   # Best Gaussian kernels only (σ = 4-8)
-  # for width in [4.0, 5.0, 6.0, 7.0, 8.0]:
-  d = 2
-  kernel_list.append(lambda X1, X2, d=2: A2codes.polyKernel(X1, X2, d))
-  kernel_names.append(f"Poly(d={d})")
+  for width in [4.0, 5.0, 6.0, 7.0, 8.0]:
+    kernel_list.append(lambda X1, X2: A2codes.gaussKernel(X1, X2, width))
+    kernel_names.append(f"Gauss(σ={width})")
 
   print(f"Testing {len(lamb_list)} lambdas × {len(kernel_list)} kernels = {len(lamb_list) * len(kernel_list)} combinations")
   print(f"Kernels: {kernel_names}")
@@ -136,8 +135,8 @@ def testMnist():
 
 
 if __name__ == "__main__":
-  # testMnist()
+  testMnist()
   
-	_plotCls()
+	# _plotCls()
 
 
