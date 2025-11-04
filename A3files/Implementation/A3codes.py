@@ -35,3 +35,23 @@ def minMulDev(X, Y):
     # Extract results and return a d x k matrix of optimal weights
     wStar = result.x.reshape(d, k)
     return wStar
+
+#Q1 b
+#TODO: verify correctness
+def classify(Xtest, W):
+
+    # Get dimensions of inputs
+    m = Xtest.shape[0]
+    k = W.shape[1]
+
+    # Get all the scores
+    zHat = Xtest @ W
+
+    # Find the class with the highest score for each sample
+    predictedClasses = np.argmax(zHat, axis = 1)
+
+    # Get one hot encoding for every sample, creating a m x k matrix
+    yHat = np.zeros((m, k))
+    yHat[np.arange(m), predictedClasses ] = 1
+
+    return yHat
