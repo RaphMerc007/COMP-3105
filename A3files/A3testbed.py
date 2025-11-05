@@ -7,7 +7,7 @@
 from matplotlib import pyplot as plt
 
 import Implementation.A3codes as A3codes
-from A3helpers import augmentX, gaussKernel, plotModel, generateData, plotPoints
+from A3helpers import augmentX, gaussKernel, plotModel, generateData, plotPoints, synClsExperiments
 
 
 def _plotCls():
@@ -23,6 +23,11 @@ def _plotCls():
 	print(f"Train accuaracy {A3codes.calculateAcc(Ytrain, A3codes.classify(Xtrain, W))}")
 
 	plotModel(Xtrain, Ytrain, W, A3codes.classify)
+
+	#Q1 d: calls built in helper function and return training accuracies for part d
+	trainAcc, testAcc = synClsExperiments(A3codes.minMulDev, A3codes.classify, A3codes.calculateAcc)
+	print("Train accuracy: \n", trainAcc)
+	print("Test accuracy: \n", testAcc)
 
 	return
 
