@@ -15,7 +15,7 @@ def _plotCls():
 	n = 100
 
 	# Generate data
-	Xtrain, Ytrain = generateData(n=n, gen_model=1, rand_seed=0)
+	Xtrain, Ytrain = generateData(n=n, gen_model=1)
 	Xtrain = augmentX(Xtrain)
 
 	# Learn and plot results
@@ -29,8 +29,8 @@ def _plotCls():
 
 def _testPCA():
 	train_acc, test_acc = A3codes.synClsExperimentsPCA()
-	print(train_acc)
-	print(test_acc)
+	print("Train accuracy: \n", train_acc)
+	print("Test accuracy: \n", test_acc)
 	return
 
 
@@ -52,7 +52,9 @@ def _plotKmeans():
 def _plotKernelKmeans():
 	Xtrain, _ = generateData(n=100, gen_model=3)
 	kernel_func = lambda X1, X2: gaussKernel(X1, X2, 0.25)
+
 	init_Y = None  # TODO: you need to change this
+
 	Y, obj_val = A3codes.kernelKmeans(Xtrain, kernel_func, 2, init_Y)
 	plotPoints(Xtrain, Y)
 	plt.legend()

@@ -8,8 +8,10 @@ import numpy as np
 import pandas as pd
 from A3helpers import convertToOneHot
 
+#TODO: note: q1 a, b, c and correct for the testbed cases most of the time, maybe due to the model generation being random
+# due to the removal of the random zeed by the prof. Double check correctness later tho
+
 #Q1 a
-# TODO: verify correctness
 def minMulDev(X, Y):
     n, d = X.shape
     # Get the k # of outputs per Y point
@@ -38,11 +40,9 @@ def minMulDev(X, Y):
     return wStar
 
 #Q1 b
-#TODO: verify correctness
 def classify(Xtest, W):
 
     # Get dimensions of inputs
-    m = Xtest.shape[0]
     k = W.shape[1]
 
     # Get all the scores

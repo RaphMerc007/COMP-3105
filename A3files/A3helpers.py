@@ -67,10 +67,10 @@ def generateData(n, gen_model):
         X = np.vstack(X)
         y = np.vstack(y)
 
-    return augmentX(X), convertToOneHot(y, n_class)
+    return X, convertToOneHot(y, n_class)
 
 
-def generateMoons(n, noise=0.05):
+def generateMoons(n, noise=0.1):
     n_samples_out = n // 2
     n_samples_in = n - n_samples_out
     outer_circ_x = np.cos(np.linspace(0, np.pi, n_samples_out))
@@ -96,7 +96,6 @@ def plotPoints(X, Y):
     k = Y.shape[1]
     markers = ['o', '+', 'd', 'x', '^', 'v', 's']
     colors = ['r', 'b', 'g', 'y', 'm', 'c', 'k']
-    X = unAugmentX(X)  # remove augmentation
     labels = Y.argmax(axis=1)
     for i in range(k):
         Xpart = X[labels == i]
