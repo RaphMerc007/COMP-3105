@@ -6,6 +6,7 @@ from scipy.optimize import minimize
 from scipy.special import logsumexp
 import numpy as np  
 import pandas as pd
+from A3helpers import convertToOneHot
 
 #Q1 a
 # TODO: verify correctness
@@ -51,7 +52,18 @@ def classify(Xtest, W):
     predictedClasses = np.argmax(zHat, axis = 1)
 
     # Get one hot encoding for every sample, creating a m x k matrix
-    yHat = np.zeros((m, k))
-    yHat[np.arange(m), predictedClasses ] = 1
+    yHat = convertToOneHot(predictedClasses, k)
 
     return yHat
+
+#Q1 c
+def calculateAcc(Yhat, Y):
+
+    # Since Y's are one hot encoded, get max of k column indices for m row samples
+    predictedClasses = np.argmax(Yhat, axis = 1)
+    classes = np.argmax(Y, axis = 1)
+
+    # Calculate accuracy, percentage of indices that match
+    accuracy = np.mean(predictedClasses == classes)
+
+    return accuracy

@@ -63,6 +63,6 @@ def _plotKernelKmeans():
 if __name__ == "__main__":
 
 	_plotCls()
-	_testPCA()
-	_plotKmeans()
-	_plotKernelKmeans()
+	# _testPCA()
+	# _plotKmeans()
+	# _plotKernelKmeans()
