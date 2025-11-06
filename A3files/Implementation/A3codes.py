@@ -4,9 +4,11 @@
 from cvxopt import matrix, solvers
 from scipy.optimize import minimize
 from scipy.special import logsumexp
+from scipy.linalg import eigh
 import numpy as np  
 import pandas as pd
 from A3helpers import convertToOneHot
+from A3helpers import generateData, augmentX, plotImgs
 
 #TODO: note: q1 a, b, c and correct for the testbed cases most of the time, maybe due to the model generation being random
 # due to the removal of the random zeed by the prof. Double check correctness later tho
@@ -67,3 +69,121 @@ def calculateAcc(Yhat, Y):
     accuracy = np.mean(predictedClasses == classes)
 
     return accuracy
+
+
+
+# Q2 a
+def PCA(X, k):
+  _, d = X.shape
+
+  # get mean of each column
+  mean = np.mean(X, axis = 0)
+  # center the data
+  X_centered = X - mean
+
+  # get the last k largest eigenvalues and eigenvectors of X^t X
+  eigvals, eigvecs = eigh(X_centered.T @ X_centered, subset_by_index = [d - k, d-1])
+
+  # sort the eigenvalues in descending order
+  idx = np.argsort(eigvals)[::-1]
+  eigvals = eigvals[idx]
+  eigvecs = eigvecs[:, idx]
+
+  # make sure we only get the top k eigenvectors
+  principal_components = eigvecs[:, :k]
+
+  # project the data onto the principal components
+  X_transformed = X_centered @ principal_components
+
+
+  return X_transformed
+
+# Q2 b
+def projPCA(Xtest, mu, U):
+  mu_row = mu.reshape(1, -1) 
+  
+  return (Xtest - mu_row) @ U 
+
+# Q2 c
+def kernelPCA(X, k, kernel_func):
+  n, _ = X.shape
+  X = X.astype(float)
+
+  # get the kernel matrix
+  K = kernel_func(X, X)
+
+  # SLOW
+  # K_norm = K - 1/n * np.ones((n, n)) @ K - 1/n * K @ np.ones((n, n)) + 1/n**2 * np.ones((n, n)) @ K @ np.ones((n, n))
+  
+  # FAST broadcasting method
+  K_row_mean = np.mean(K, axis=1, keepdims=True)  # Column vector
+  K_col_mean = np.mean(K, axis=0, keepdims=True)  # Row vector
+  K_mean = np.mean(K)
+  K_norm = K - K_row_mean - K_col_mean + K_mean
+
+  # get the last k largest eigenvalues and eigenvectors of K_norm
+  eigvals, eigvecs = eigh(K_norm, subset_by_index = [n - k, n-1])
+
+  # sort the eigenvalues in descending order
+  idx = np.argsort(eigvals)[::-1]
+  eigvals = eigvals[idx]
+  eigvecs = eigvecs[:, idx]
+
+  # make sure we only get the top k eigenvectors
+  return eigvecs[:, :k].T
+
+# Q2 d
+def projKernelPCA(Xtest, Xtrain, kernel_func, A):  
+  # Compute kernel matrix: K_test[i, j] = kernel_func(Xtest[i], Xtrain[j])
+  K_test = kernel_func(Xtest, Xtrain)
+  
+  # Project: A @ K_test^T
+  Xtest_proj = (A @ K_test.T).T
+  return Xtest_proj
+
+
+
+# Q2 e
+def synClsExperimentsPCA():
+  n_runs = 100
+  n_train = 128
+  n_test = 1000
+  dim_list = [1, 2]
+  gen_model_list = [1, 2]
+  train_acc = np.zeros([len(dim_list), len(gen_model_list), n_runs])
+  test_acc = np.zeros([len(dim_list), len(gen_model_list), n_runs])
+  np.random.seed(91)
+  for r in range(n_runs):
+    for i, k in enumerate(dim_list):
+      for j, gen_model in enumerate(gen_model_list):
+        Xtrain, Ytrain = generateData(n=n_train, gen_model=gen_model)
+        Xtest, Ytest = generateData(n=n_test, gen_model=gen_model)
+
+        # Get mean and compute PCA
+        mu = np.mean(Xtrain, axis=0)
+        Xtrain_centered = Xtrain - mu
+        
+        # Get principal components
+        eigvals, eigvecs = eigh(Xtrain_centered.T @ Xtrain_centered, subset_by_index=[Xtrain.shape[1] - k, Xtrain.shape[1] - 1])
+        idx = np.argsort(eigvals)[::-1]
+        U = eigvecs[:, idx][:, :k]  # (d, k) principal components
+
+        Xtrain_proj = projPCA(Xtrain, mu, U) 
+        Xtest_proj = projPCA(Xtest, mu, U)
+
+        Xtrain_proj = augmentX(Xtrain_proj) # add augmentation
+        Xtest_proj = augmentX(Xtest_proj)
+        W = minMulDev(Xtrain_proj, Ytrain) # from Q1
+
+        Yhat = classify(Xtrain_proj, W) # from Q1
+        train_acc[i, j, r] = calculateAcc(Yhat, Ytrain) # from Q1
+
+        Yhat = classify(Xtest_proj, W)
+        test_acc[i, j, r] = calculateAcc(Yhat, Ytest)
+
+  # compute the average accuracies over runs
+  train_acc = np.mean(train_acc, axis = 2)
+  test_acc = np.mean(test_acc, axis = 2)
+
+  # return 2-by-2 train accuracy and 2-by-2 test accuracy
+  return train_acc, test_acc
