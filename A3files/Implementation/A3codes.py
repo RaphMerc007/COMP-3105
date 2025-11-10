@@ -223,12 +223,20 @@ def kmeans(X, k, max_iter=1000):
 # Q3 b
 def repeatKmeans(X, k, n_runs=100):
   best_obj_val = float('inf')
+  best_Y = None
+  best_U = None
+  
   for r in range(n_runs):
     Y, U, obj_val = kmeans(X, k)
-    # TODO: Compare obj_val with best_obj_val. If it is lower,
+    # Compare obj_val with best_obj_val. If it is lower,
     # then record the current Y, U and update best_obj_val
-  
-  # TODO: Return the best Y, U and best_obj_val
+    if obj_val < best_obj_val:
+      best_obj_val = obj_val
+      best_Y = Y
+      best_U = U
+
+  # Return the best Y, U and best_obj_val
+  return best_Y, best_U, best_obj_val
 
 
 # Q3 c
