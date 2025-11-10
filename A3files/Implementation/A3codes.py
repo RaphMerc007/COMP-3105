@@ -202,25 +202,17 @@ def kmeans(X, k, max_iter=1000):
   U = X[np.random.choice(n, k, replace=False)].copy()
   for i in range(max_iter):
     # Compute pairwise distance between X and U
-    D = cdist(X, U, metric='euclidean')  
+    D = cdist(X, U, metric='sqeuclidean')  
     
     # Find the new cluster assignments
-    Y = np.argmin(D, axis=1)
-    
-    old_U = U
+    j_star = np.argmin(D, axis=1)
+    Y = np.zeros((n, k))
+    Y[np.arange(n), j_star] = 1
+
+    old_U = U.copy()
     
     # Update cluster centers
-    U = np.zeros((k, d))
-    for j in range(k):
-      # Get all points assigned to cluster j
-      points_in_cluster = X[Y == j] 
-      
-      # Check if cluster j has any points
-      if len(points_in_cluster) > 0:
-        U[j] = np.mean(points_in_cluster, axis=0)
-      else:
-        U[j] = old_U[j]
-
+    U = np.linalg.pinv(Y) @ X
 
     if np.allclose(old_U, U):
       break
