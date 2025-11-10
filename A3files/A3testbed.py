@@ -62,7 +62,7 @@ def _plotKernelKmeans():
 	k = 2
 	best_Y = None
 	best_obj_val = float('inf')
-	for _ in range(10000):
+	for _ in range(5000):
 		init_Y = np.eye(k)[np.random.randint(0, k, size=n)]
 		Y, obj_val = A3codes.kernelKmeans(Xtrain, kernel_func, 2, init_Y)
 		if obj_val < best_obj_val:

@@ -216,7 +216,8 @@ def kmeans(X, k, max_iter=1000):
 
     if np.allclose(old_U, U):
       break
-
+  # Recompute D with final U for objective calculation
+  D = cdist(X, U, metric='sqeuclidean')
   obj_val = (0.5 / n) * np.sum(D.min(axis=1))
   return Y, U, obj_val
 
@@ -277,5 +278,12 @@ def kernelKmeans(X, kernel_func, k, init_Y, max_iter=1000):
     if np.allclose(old_Y, Y):
       break
   
+  # Recompute D with final Y for objective calculation
+  pinv_Y = np.linalg.pinv(Y)
+  term1 = np.diag(K)[:, np.newaxis] @ np.ones((1, k))
+  term2 = np.ones((n, 1)) @ np.diag(pinv_Y @ K @ pinv_Y.T)[np.newaxis, :]
+  term3 = 2 * K @ pinv_Y.T
+  D = term1 + term2 - term3
+
   obj_val = (0.5 / n) * np.sum(D.min(axis=1))
   return Y, obj_val
