@@ -249,22 +249,33 @@ def chooseK(X, k_candidates=[2,3,4,5,6,7,8,9]):
   return obj_val_list
 
 # Q3 d
-# def kernelKmeans(X, kernel_func, k, init_Y, max_iter=1000):
-#   n, d = X.shape
-#   assert max_iter > 0 and k < n
-#   K = kernel_func(X, X)
-#   Y = init_Y
-#   for i in range(max_iter):
-#     # TODO: Compute pairwise distance matrix
-#     D = 
+def kernelKmeans(X, kernel_func, k, init_Y, max_iter=1000):
+  n, d = X.shape
+  assert max_iter > 0 and k < n
+  K = kernel_func(X, X)
+  Y = init_Y
+  for i in range(max_iter):
+    # Compute pairwise distance matrix
+    # diag(K) (1_k)^T + 1_n diag(Y^+ K(Y^+)^T)^T - 2K(Y^+)^T
 
-#     old_Y = Y
+    pinv_Y = np.linalg.pinv(Y)
+
+    term1 = np.diag(K)[:, np.newaxis] @ np.ones((1,k))
+    term2 = np.ones((n, 1)) @ np.diag(pinv_Y @ K @ pinv_Y.T)[np.newaxis, :]
+    term3 = 2*K @ pinv_Y.T
+
+    D = term1 + term2 - term3
+
+
+    old_Y = Y.copy()
     
-#     # TODO: Find the new cluster assignments
-#     Y = 
-
-#     if np.allclose(old_Y, Y):
-#       break
+    # Find the new cluster assignments
+    j_star = np.argmin(D, axis=1)
+    Y = np.zeros((n, k))
+    Y[np.arange(n), j_star] = 1
+    
+    if np.allclose(old_Y, Y):
+      break
   
-#   obj_val = (0.5 / n) * np.sum(D.min(axis=1))
-#   return Y, obj_val
+  obj_val = (0.5 / n) * np.sum(D.min(axis=1))
+  return Y, obj_val

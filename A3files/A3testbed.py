@@ -5,7 +5,7 @@
 #       This script is not meant to be thorough (it does not call all your functions).
 #       We will use a different script to test your codes. 
 from matplotlib import pyplot as plt
-
+import numpy as np
 import Implementation.A3codes as A3codes
 from A3helpers import augmentX, gaussKernel, plotModel, generateData, plotPoints, synClsExperiments
 
@@ -57,11 +57,19 @@ def _plotKmeans():
 def _plotKernelKmeans():
 	Xtrain, _ = generateData(n=100, gen_model=3)
 	kernel_func = lambda X1, X2: gaussKernel(X1, X2, 0.25)
+	
+	n = Xtrain.shape[0]
+	k = 2
+	best_Y = None
+	best_obj_val = float('inf')
+	for _ in range(10000):
+		init_Y = np.eye(k)[np.random.randint(0, k, size=n)]
+		Y, obj_val = A3codes.kernelKmeans(Xtrain, kernel_func, 2, init_Y)
+		if obj_val < best_obj_val:
+			best_obj_val = obj_val
+			best_Y = Y
 
-	init_Y = None  # TODO: you need to change this
-
-	Y, obj_val = A3codes.kernelKmeans(Xtrain, kernel_func, 2, init_Y)
-	plotPoints(Xtrain, Y)
+	plotPoints(Xtrain, best_Y)
 	plt.legend()
 	plt.show()
 	return
@@ -70,6 +78,6 @@ def _plotKernelKmeans():
 if __name__ == "__main__":
 
 	# _plotCls()
-	_testPCA()
+	# _testPCA()
 	# _plotKmeans()
-	# _plotKernelKmeans()
+	_plotKernelKmeans()
