@@ -129,19 +129,24 @@ def kernelPCA(X, k, kernel_func):
   eigvals = eigvals[idx]
   eigvecs = eigvecs[:, idx]
 
-  # make sure we only get the top k eigenvectors
-  return eigvecs[:, :k].T
+  # After getting eigvecs and eigvals, normalize:
+  alphas = eigvecs[:, :k] / np.sqrt(eigvals[:k])  # Divide by sqrt(eigenvalue)
+  return alphas.T  # (k, n)
 
 # Q2 d
-def projKernelPCA(Xtest, Xtrain, kernel_func, A):  
-  # Compute kernel matrix: K_test[i, j] = kernel_func(Xtest[i], Xtrain[j])
-  K_test = kernel_func(Xtest, Xtrain)
+def projKernelPCA(Xtest, Xtrain, kernel_func, A):
+  # Compute kernel matrices
+  K_test = kernel_func(Xtest, Xtrain) 
+  K_train = kernel_func(Xtrain, Xtrain) 
   
-  # Project: A @ K_test^T
-  Xtest_proj = (A @ K_test.T).T
-  return Xtest_proj
-
-
+  # Center the kernel matrix using broadcasting
+  K_train_col_mean = np.mean(K_train, axis=0, keepdims=True)  
+  K_test_row_mean = np.mean(K_test, axis=1, keepdims=True)   
+  K_train_mean = np.mean(K_train)                      
+  
+  Kete_tr = K_test - K_train_col_mean - K_test_row_mean + K_train_mean
+  
+  return Kete_tr @ A.T 
 
 # Q2 e
 def synClsExperimentsPCA():
