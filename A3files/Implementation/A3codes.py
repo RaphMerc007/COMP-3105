@@ -225,7 +225,7 @@ def repeatKmeans(X, k, n_runs=100):
   best_obj_val = float('inf')
   best_Y = None
   best_U = None
-  
+
   for r in range(n_runs):
     Y, U, obj_val = kmeans(X, k)
     # Compare obj_val with best_obj_val. If it is lower,
@@ -240,22 +240,31 @@ def repeatKmeans(X, k, n_runs=100):
 
 
 # Q3 c
-def kernelKmeans(X, kernel_func, k, init_Y, max_iter=1000):
-  n, d = X.shape
-  assert max_iter > 0 and k < n
-  K = kernel_func(X, X)
-  Y = init_Y
-  for i in range(max_iter):
-    # TODO: Compute pairwise distance matrix
-    D = 
-
-    old_Y = Y
+def chooseK(X, k_candidates=[2,3,4,5,6,7,8,9]):
+  obj_val_list = []
+  for k in k_candidates:
+    Y, U, obj_val = repeatKmeans(X, k)
+    obj_val_list.append(obj_val)
     
-    # TODO: Find the new cluster assignments
-    Y = 
+  return obj_val_list
 
-    if np.allclose(old_Y, Y):
-      break
+# Q3 d
+# def kernelKmeans(X, kernel_func, k, init_Y, max_iter=1000):
+#   n, d = X.shape
+#   assert max_iter > 0 and k < n
+#   K = kernel_func(X, X)
+#   Y = init_Y
+#   for i in range(max_iter):
+#     # TODO: Compute pairwise distance matrix
+#     D = 
+
+#     old_Y = Y
+    
+#     # TODO: Find the new cluster assignments
+#     Y = 
+
+#     if np.allclose(old_Y, Y):
+#       break
   
-  obj_val = (0.5 / n) * np.sum(D.min(axis=1))
-  return Y, obj_val
+#   obj_val = (0.5 / n) * np.sum(D.min(axis=1))
+#   return Y, obj_val
