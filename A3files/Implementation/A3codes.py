@@ -192,3 +192,58 @@ def synClsExperimentsPCA():
 
   # return 2-by-2 train accuracy and 2-by-2 test accuracy
   return train_acc, test_acc
+
+# Q3 a
+def kmeans(X, k, max_iter=1000):
+  n, d = X.shape
+  assert max_iter > 0 and k < n
+  # TODO: Choose k random points from X as initial centers
+  U = 
+  for i in range(max_iter):
+    # TODO: Compute pairwise distance between X and U
+    D = 
+    
+    # TODO: Find the new cluster assignments
+    Y =
+    
+    old_U = U
+    
+    # TODO: Update cluster centers
+    U = 
+
+    if np.allclose(old_U, U):
+      break
+  obj_val = (0.5 / n) * np.sum(D.min(axis=1))
+  return Y, U, obj_val
+
+# Q3 b
+def repeatKmeans(X, k, n_runs=100):
+  best_obj_val = float('inf')
+  for r in range(n_runs):
+    Y, U, obj_val = kmeans(X, k)
+    # TODO: Compare obj_val with best_obj_val. If it is lower,
+    # then record the current Y, U and update best_obj_val
+  
+  # TODO: Return the best Y, U and best_obj_val
+
+
+# Q3 c
+def kernelKmeans(X, kernel_func, k, init_Y, max_iter=1000):
+  n, d = X.shape
+  assert max_iter > 0 and k < n
+  K = kernel_func(X, X)
+  Y = init_Y
+  for i in range(max_iter):
+    # TODO: Compute pairwise distance matrix
+    D = 
+
+    old_Y = Y
+    
+    # TODO: Find the new cluster assignments
+    Y = 
+    
+    if np.allclose(old_Y, Y):
+      break
+  
+  obj_val = (0.5 / n) * np.sum(D.min(axis=1))
+  return Y, obj_val
