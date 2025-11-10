@@ -5,6 +5,7 @@ from cvxopt import matrix, solvers
 from scipy.optimize import minimize
 from scipy.special import logsumexp
 from scipy.linalg import eigh
+from scipy.spatial.distance import cdist
 import numpy as np  
 import pandas as pd
 from A3helpers import convertToOneHot
@@ -197,22 +198,33 @@ def synClsExperimentsPCA():
 def kmeans(X, k, max_iter=1000):
   n, d = X.shape
   assert max_iter > 0 and k < n
-  # TODO: Choose k random points from X as initial centers
-  U = 
+  # Choose k random points from X as initial centers
+  U = X[np.random.choice(n, k, replace=False)].copy()
   for i in range(max_iter):
-    # TODO: Compute pairwise distance between X and U
-    D = 
+    # Compute pairwise distance between X and U
+    D = cdist(X, U, metric='euclidean')  
     
-    # TODO: Find the new cluster assignments
-    Y =
+    # Find the new cluster assignments
+    Y = np.argmin(D, axis=1)
     
     old_U = U
     
-    # TODO: Update cluster centers
-    U = 
+    # Update cluster centers
+    U = np.zeros((k, d))
+    for j in range(k):
+      # Get all points assigned to cluster j
+      points_in_cluster = X[Y == j] 
+      
+      # Check if cluster j has any points
+      if len(points_in_cluster) > 0:
+        U[j] = np.mean(points_in_cluster, axis=0)
+      else:
+        U[j] = old_U[j]
+
 
     if np.allclose(old_U, U):
       break
+
   obj_val = (0.5 / n) * np.sum(D.min(axis=1))
   return Y, U, obj_val
 
@@ -241,7 +253,7 @@ def kernelKmeans(X, kernel_func, k, init_Y, max_iter=1000):
     
     # TODO: Find the new cluster assignments
     Y = 
-    
+
     if np.allclose(old_Y, Y):
       break
   
