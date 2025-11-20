@@ -56,61 +56,47 @@ def learn(path_to_in_domain, path_to_out_domain):
   model = model.to(device)
   
   criterion = nn.CrossEntropyLoss()
-  optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
+  optimizer = optim.Adam(model.parameters(), lr=0.001)
   
   model.train()
-  batch_size = 32
+  batch_size = 8
   
-  # After some testing, does not get better after 18 epochs
-  for epoch in range(17):
-    # Shuffle data
-    import random
-    random.shuffle(in_train)
-    correct = 0
-    total = 0
+  try:
+    # After some testing, does not get better after 18 epochs
+    for epoch in range(40):
+      # Shuffle data
+      import random
+      random.shuffle(in_train)
+      correct = 0
+      total = 0
+
+
+      # Process in batches
+      for i in range(0, len(in_train), batch_size):
+        batch = in_train[i:i+batch_size]
+        images = torch.stack([img for img, _ in batch]).to(device)
+        labels = torch.tensor([label for _, label in batch]).to(device)
+
+        total += labels.size(0)
+        _, predicted = torch.max(model(images).data, 1) 
+        correct += (predicted == labels).sum().item()
+
+        # Train
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        # if i % 30 == 0:
+          # print(f"Epoch {epoch+1} {i/len(in_train):.2f} {correct/total:.4f}")
 
 
 
-    # Process in batches
-    for i in range(0, len(in_train), batch_size):
-      batch = in_train[i:i+batch_size]
-      images = torch.stack([img for img, _ in batch]).to(device)
-      labels = torch.tensor([label for _, label in batch]).to(device)
+      print(f"Epoch {epoch+1} completed!!!!! {correct/total:.4f}")
 
-      total += labels.size(0)
-      _, predicted = torch.max(model(images).data, 1) 
-      correct += (predicted == labels).sum().item()
-
-      # Train
-      optimizer.zero_grad()
-      outputs = model(images)
-      loss = criterion(outputs, labels)
-      loss.backward()
-      optimizer.step()
-
-      if i % 3 == 0:
-        print(f"Epoch {epoch+1} {i/len(in_train):.2f} {correct/total:.4f}")
-
-
-    # Guess random for out-domain
-    # TODO: this is not effective. need to find a way to penalize more for out-domain data
-    for i in range(0, len(out_train), batch_size):
-      batch = out_train[i:i+batch_size]
-      images = torch.stack(batch).to(device)      
-      actual_batch_size = images.size(0)  # Get actual batch size (might be < 32)
-      
-      optimizer.zero_grad()
-      outputs = model(images)
-      
-      random_labels = torch.randint(0, 10, (actual_batch_size,)).to(device)
-      loss = criterion(outputs, random_labels)
-            
-      loss.backward()
-      optimizer.step()
-
-      print(f"{i/len(out_train):.2f}")
-
-    print(f"Epoch {epoch+1} completed!!!!! {correct/total:.4f}")
+  except KeyboardInterrupt:
+    print(" Moving to test")
 
   model.class_to_idx = class_to_idx
   model.eval()
