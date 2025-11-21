@@ -14,12 +14,13 @@ class_to_idx = {"Alarm_Clock": 0, "Bike": 1, "Desk_Lamp": 2, "Monitor": 3, "Mous
 
 def get_transforms(augment):
   if augment:
-    # Training transforms with data augmentation
+    # Training transforms with more aggressive data augmentation
     transform = transforms.Compose([
-      transforms.Resize((256, 256)),  # Slightly larger for cropping
+      transforms.Resize((280, 280)),  # Larger for more aggressive cropping
       transforms.RandomCrop((224, 224)),  # Random crop for augmentation
       transforms.RandomHorizontalFlip(p=0.5),  # Random horizontal flip
-      transforms.ColorJitter(brightness=0.2, contrast=0.2),  # Color jitter
+      transforms.RandomRotation(degrees=15),  # Random rotation up to 15 degrees
+      transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.3, hue=0.1),  # More aggressive color jitter
       transforms.ToTensor(),
       transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
@@ -69,7 +70,6 @@ def learn(path_to_in_domain, path_to_out_domain):
   in_train_augmented = [(no_augment_transform(img), label) for img, label in in_train]
   out_train_augmented = [no_augment_transform(img) for img in out_train]
   
-  # Add 9 augmented versions of each image
   for _ in range(4):
     for img, label in in_train:
       in_train_augmented.append((augment_transform(img), label))
@@ -102,12 +102,13 @@ def learn(path_to_in_domain, path_to_out_domain):
   
   criterion_categorise = nn.CrossEntropyLoss()
   optimizer_categorise = optim.Adam(model_categorise.parameters(), lr=0.002, weight_decay=0.0001)
+  scheduler_categorise = optim.lr_scheduler.StepLR(optimizer_categorise, step_size=16, gamma=0.5)
   
   model_categorise.train()
-  batch_size = 16
+  batch_size = 32
   
   try:
-    for epoch in range(80):
+    for epoch in range(64):
       # Shuffle data
       import random
       random.shuffle(categorise_data_train)
@@ -133,7 +134,8 @@ def learn(path_to_in_domain, path_to_out_domain):
         _, predicted = torch.max(outputs.data, 1) 
         correct += (predicted == labels).sum().item()
 
-      print(f"Epoch {epoch+1} completed!!!!! {correct/total:.4f}")
+      scheduler_categorise.step()
+      print(f"Epoch {epoch+1} completed!!!!! {correct/total:.4f}, LR: {scheduler_categorise.get_last_lr()[0]:.5f}")
 
 
   except KeyboardInterrupt:
@@ -157,14 +159,15 @@ def learn(path_to_in_domain, path_to_out_domain):
   model_classify = model_classify.to(device_classify)
 
   criterion_classify = nn.CrossEntropyLoss()
-  optimizer_classify = optim.Adam(model_classify.parameters(), lr=0.001, weight_decay=0.001)
+  optimizer_classify = optim.Adam(model_classify.parameters(), lr=0.002, weight_decay=0.0001)
+  scheduler_classify = optim.lr_scheduler.StepLR(optimizer_classify, step_size=8, gamma=0.5)
 
   # Use the pre-augmented in-domain data
   model_classify.train()
-  batch_size = 16
+  batch_size = 32
 
   try:
-    for epoch in range(60):
+    for epoch in range(32):
       # Shuffle data
       import random
       random.shuffle(in_train_augmented)
@@ -190,9 +193,8 @@ def learn(path_to_in_domain, path_to_out_domain):
         _, predicted = torch.max(outputs.data, 1) 
         correct += (predicted == labels).sum().item()
 
-
-
-      print(f"Epoch {epoch+1} completed!!!!! {correct/total:.4f}")
+      scheduler_classify.step()
+      print(f"Epoch {epoch+1} completed!!!!! {correct/total:.4f}, LR: {scheduler_classify.get_last_lr()[0]:.5f}")
 
   except KeyboardInterrupt:
     print(" Moving to test")
