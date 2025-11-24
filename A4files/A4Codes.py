@@ -74,11 +74,21 @@ def learn(path_to_in_domain, path_to_out_domain):
     for img, label in in_train:
       in_train_augmented.append((augment_transform(img), label))
    
-    while len(out_train_augmented) < len(in_train_augmented):
-      for img in out_train:
-        out_train_augmented.append(augment_transform(img))
-        if len(out_train_augmented) >= len(in_train_augmented):
-          break
+    while len(out_train_augmented) != len(in_train_augmented):
+
+      if len(out_train_augmented) < len(in_train_augmented):
+        for img in out_train:
+          out_train_augmented.append(augment_transform(img))
+          if len(out_train_augmented) >= len(in_train_augmented):
+            break
+          
+      if len(out_train_augmented) > len(in_train_augmented):
+        for img, label in in_train:
+          in_train_augmented.append((augment_transform(img), label))
+          if len(out_train_augmented) == len(in_train_augmented):
+            break
+
+
   
   
   print(f"Augmented dataset created: {len(in_train_augmented)} in-domain images, {len(out_train_augmented)} out-domain images")
