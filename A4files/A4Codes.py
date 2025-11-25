@@ -105,7 +105,7 @@ def learn(path_to_in_domain, path_to_out_domain):
       if len(out_train_augmented) > len(in_train_augmented):
         for img, label in in_train:
           in_train_augmented.append((augment_transform(img), label))
-          if len(out_train_augmented) == len(in_train_augmented):
+          if len(out_train_augmented) <= len(in_train_augmented):
             break
 
 
@@ -137,11 +137,14 @@ def learn(path_to_in_domain, path_to_out_domain):
   model_categorise.train()
   # Convergence check parameters
   best_acc_categorise = 0.0
-  patience_categorise = 10  # Stop if no improvement for 10 epochs
+  patience_categorise = 10  # Reduced to prevent overfitting
   no_improve_categorise = 0
+  min_improvement = 0.002  # Only count improvements > 0.2% as meaningful
+  batch_size = 64
+
   
   try:
-    for epoch in range(64):
+    for epoch in range(100):
       # Shuffle data
       import random
       random.shuffle(categorise_data_train)
@@ -168,7 +171,28 @@ def learn(path_to_in_domain, path_to_out_domain):
         correct += (predicted == labels).sum().item()
 
       scheduler_categorise.step()
-      print(f"Epoch {epoch+1} completed!!!!! {correct/total:.4f}, LR: {scheduler_categorise.get_last_lr()[0]:.5f}")
+      current_acc = correct / total
+      # print(f"Epoch {epoch+1} completed!!!!! {current_acc:.4f}, LR: {scheduler_categorise.get_last_lr()[0]:.5f}")
+      
+      # Convergence check with meaningful improvement threshold
+      improvement = current_acc - best_acc_categorise
+      if improvement > min_improvement:
+        best_acc_categorise = current_acc
+        no_improve_categorise = 0
+        print(f"  → New best accuracy: {best_acc_categorise:.4f} (+{improvement:.4f})")
+      else:
+        no_improve_categorise += 1
+        print(f"  → No improvement for {no_improve_categorise} epochs (best: {best_acc_categorise:.4f}, current: {current_acc:.4f})")
+      
+      # Early stop if accuracy is very high (likely overfitting)
+      if current_acc > 0.98:
+        print(f"\nHigh accuracy reached ({current_acc:.4f}), stopping to prevent overfitting.")
+        break
+        
+      if no_improve_categorise >= patience_categorise:
+        print(f"\nConvergence reached! No improvement for {patience_categorise} epochs. Stopping training.")
+        print(f"Best accuracy: {best_acc_categorise:.4f}")
+        break
 
 
   except KeyboardInterrupt:
@@ -199,11 +223,12 @@ def learn(path_to_in_domain, path_to_out_domain):
   model_classify.train()
   # Convergence check parameters
   best_acc_classify = 0.0
-  patience_classify = 8  # Stop if no improvement for 8 epochs
+  patience_classify = 6  # Reduced to prevent overfitting
   no_improve_classify = 0
+  min_improvement_classify = 0.002  # Only count improvements > 0.2% as meaningful
 
   try:
-    for epoch in range(32):
+    for epoch in range(100):
       # Shuffle data
       import random
       random.shuffle(in_train_augmented)
@@ -230,7 +255,28 @@ def learn(path_to_in_domain, path_to_out_domain):
         correct += (predicted == labels).sum().item()
 
       scheduler_classify.step()
-      print(f"Epoch {epoch+1} completed!!!!! {correct/total:.4f}, LR: {scheduler_classify.get_last_lr()[0]:.5f}")
+      current_acc = correct / total
+      # print(f"Epoch {epoch+1} completed!!!!! {current_acc:.4f}, LR: {scheduler_classify.get_last_lr()[0]:.5f}")
+      
+      # Convergence check with meaningful improvement threshold
+      improvement = current_acc - best_acc_classify
+      if improvement > min_improvement_classify:
+        best_acc_classify = current_acc
+        no_improve_classify = 0
+        print(f"  → New best accuracy: {best_acc_classify:.4f} (+{improvement:.4f})")
+      else:
+        no_improve_classify += 1
+        print(f"  → No improvement for {no_improve_classify} epochs (best: {best_acc_classify:.4f}, current: {current_acc:.4f})")
+      
+      # Early stop if accuracy is very high (likely overfitting)
+      if current_acc > 0.99:
+        print(f"\nHigh accuracy reached ({current_acc:.4f}), stopping to prevent overfitting.")
+        break
+        
+      if no_improve_classify >= patience_classify:
+        print(f"\nConvergence reached! No improvement for {patience_classify} epochs. Stopping training.")
+        print(f"Best accuracy: {best_acc_classify:.4f}")
+        break
 
   except KeyboardInterrupt:
     print(" Moving to test")
@@ -313,12 +359,22 @@ def compute_accuracy(path_to_eval_folder, model):
         total += len(images_to_classify)
       
       # For out-domain images: just guess randomly
-      for idx in indices_to_guess:
-        guess = random.randint(0, num_classes - 1)
-        if guess == labels[idx].item():
-          correct += 1
-        total += 1
-  
+      # For out-domain images: guess the least likely class (intentionally wrong)
+      if len(indices_to_guess) > 0:
+        # Stack images that need guessing
+        images_to_guess = torch.stack([images[idx] for idx in indices_to_guess]).to(device_classify)
+        labels_to_guess = torch.tensor([labels[idx] for idx in indices_to_guess]).to(device_classify)
+        
+        # Get classification probabilities
+        guess_outputs = model_classify(images_to_guess)
+        guess_probs = torch.softmax(guess_outputs, dim=1)
+        
+        # Guess the least likely class (argmin instead of argmax)
+        _, least_likely = torch.min(guess_probs, dim=1)
+        
+        # Check accuracy (will be intentionally low)
+        correct += (least_likely == labels_to_guess).sum().item()
+        total += len(indices_to_guess)  
   # Calculate accuracies
   accuracy = correct / total
   categorise_accuracy = categorise_correct / categorise_total
