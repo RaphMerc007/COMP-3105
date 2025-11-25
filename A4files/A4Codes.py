@@ -9,8 +9,13 @@ from torchvision.models import resnet18
 from PIL import Image
 
 
-class_to_idx = {"Alarm_Clock": 0, "Bike": 1, "Desk_Lamp": 2, "Monitor": 3, "Mouse": 4, 
-                "Oven": 5, "Pencil": 6, "Radio": 7, "Refrigerator": 8, "Screwdriver": 9}
+class ModelWrapper:
+  """Wrapper class to hold both categorization and classification models"""
+  def __init__(self, model_classify, model_categorise, class_to_idx, num_classes):
+    self.model_classify = model_classify
+    self.model_categorise = model_categorise
+    self.class_to_idx = class_to_idx
+    self.num_classes = num_classes
 
 def get_transforms(augment):
   if augment:
@@ -33,11 +38,23 @@ def get_transforms(augment):
     ])
   return transform
 
-def load_data(path, has_labels):
+def discover_classes(path):
+  """Discover class names from folder structure and create class_to_idx mapping"""
+  classes = []
+  for folder in os.listdir(path):
+    if folder != '.DS_Store' and os.path.isdir(os.path.join(path, folder)):
+      classes.append(folder)
+  classes.sort()  # Sort for consistent ordering
+  class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
+  return class_to_idx, len(classes)
+
+def load_data(path, has_labels, class_to_idx=None):
   images = []
   if has_labels:
+    if class_to_idx is None:
+      class_to_idx, _ = discover_classes(path)
     for folder in os.listdir(path): 
-      if folder != '.DS_Store':
+      if folder != '.DS_Store' and folder in class_to_idx:
         folder_path = os.path.join(path, folder)
         for file in os.listdir(folder_path):
           if file.endswith('.jpg'):
@@ -58,7 +75,10 @@ def load_data(path, has_labels):
 
 
 def learn(path_to_in_domain, path_to_out_domain):
-  in_train = load_data(path_to_in_domain, True)
+  # Discover classes dynamically from in-domain training data
+  class_to_idx, num_classes = discover_classes(path_to_in_domain)
+  
+  in_train = load_data(path_to_in_domain, True, class_to_idx)
   out_train = load_data(path_to_out_domain, False)
 
   # Create augmented versions (9 additional versions to make ~10x larger)
@@ -115,7 +135,10 @@ def learn(path_to_in_domain, path_to_out_domain):
   scheduler_categorise = optim.lr_scheduler.StepLR(optimizer_categorise, step_size=16, gamma=0.5)
   
   model_categorise.train()
-  batch_size = 32
+  # Convergence check parameters
+  best_acc_categorise = 0.0
+  patience_categorise = 10  # Stop if no improvement for 10 epochs
+  no_improve_categorise = 0
   
   try:
     for epoch in range(64):
@@ -164,7 +187,7 @@ def learn(path_to_in_domain, path_to_out_domain):
   model_classify = resnet18(weights=None) # not allowed to use pretrained model
   model_classify.fc = nn.Sequential(
     nn.Dropout(0.5),
-    nn.Linear(model_classify.fc.in_features, 10)
+    nn.Linear(model_classify.fc.in_features, num_classes)
   )
   model_classify = model_classify.to(device_classify)
 
@@ -174,7 +197,10 @@ def learn(path_to_in_domain, path_to_out_domain):
 
   # Use the pre-augmented in-domain data
   model_classify.train()
-  batch_size = 32
+  # Convergence check parameters
+  best_acc_classify = 0.0
+  patience_classify = 8  # Stop if no improvement for 8 epochs
+  no_improve_classify = 0
 
   try:
     for epoch in range(32):
@@ -209,9 +235,11 @@ def learn(path_to_in_domain, path_to_out_domain):
   except KeyboardInterrupt:
     print(" Moving to test")
 
-  model_classify.class_to_idx = class_to_idx
   model_classify.eval()
-  return model_classify, model_categorise
+  model_categorise.eval()
+  
+  # Return wrapped model
+  return ModelWrapper(model_classify, model_categorise, class_to_idx, num_classes)
 
 
 
@@ -219,8 +247,14 @@ def learn(path_to_in_domain, path_to_out_domain):
 
 
 
-def compute_accuracy(path_to_eval_folder, model_classify, model_categorise):
-  eval_data_pil = load_data(path_to_eval_folder, True)
+def compute_accuracy(path_to_eval_folder, model):
+  # Extract models and class info from wrapper
+  model_classify = model.model_classify
+  model_categorise = model.model_categorise
+  class_to_idx = model.class_to_idx
+  num_classes = model.num_classes
+  
+  eval_data_pil = load_data(path_to_eval_folder, True, class_to_idx)
   # Transform PIL images to tensors
   eval_transform = get_transforms(False)
   eval_data = [(eval_transform(img), label) for img, label in eval_data_pil]
@@ -280,7 +314,7 @@ def compute_accuracy(path_to_eval_folder, model_classify, model_categorise):
       
       # For out-domain images: just guess randomly
       for idx in indices_to_guess:
-        guess = random.randint(0, 9)
+        guess = random.randint(0, num_classes - 1)
         if guess == labels[idx].item():
           correct += 1
         total += 1
@@ -304,14 +338,14 @@ time_start = time.time()
 
 
 
-model_classify, model_categorise = learn('./A4data/in-domain-train', './A4data/out-domain-train')
+model = learn('./A4data/in-domain-train', './A4data/out-domain-train')
 
 # Test on in-domain eval
-in_acc = compute_accuracy('./A4data/in-domain-eval', model_classify, model_categorise)
+in_acc = compute_accuracy('./A4data/in-domain-eval', model)
 print(f"In-domain accuracy: {in_acc:.4f}")
 
 # Test on out-domain eval
-out_acc = compute_accuracy('./A4data/out-domain-eval', model_classify, model_categorise)
+out_acc = compute_accuracy('./A4data/out-domain-eval', model)
 print(f"Out-domain accuracy: {out_acc:.4f}")
 
 
