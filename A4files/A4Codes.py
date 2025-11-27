@@ -8,7 +8,6 @@ import torchvision.transforms as transforms
 from torchvision.models import resnet18
 from PIL import Image
 
-
 class ModelWrapper:
   """Wrapper class to hold both categorization and classification models"""
   def __init__(self, model_classify, model_categorise, class_to_idx, num_classes):
@@ -25,16 +24,14 @@ def get_transforms(augment):
       transforms.RandomCrop((224, 224)),  # Random crop for augmentation
       transforms.RandomHorizontalFlip(p=0.5),  # Random horizontal flip
       transforms.RandomRotation(degrees=15),  # Random rotation up to 15 degrees
-      transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.3, hue=0.1),  # More aggressive color jitter
-      transforms.ToTensor(),
-      transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+      transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.4, hue=0.3),  # More aggressive color jitter
+      transforms.ToTensor()
     ])
   else:
     # Evaluation transforms (no augmentation)
     transform = transforms.Compose([
       transforms.Resize((224, 224)),
       transforms.ToTensor(),
-      transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
   return transform
 
@@ -90,10 +87,10 @@ def learn(path_to_in_domain, path_to_out_domain):
   in_train_augmented = [(no_augment_transform(img), label) for img, label in in_train]
   out_train_augmented = [no_augment_transform(img) for img in out_train]
   
-  for _ in range(4):
+  for _ in range(6):
     for img, label in in_train:
       in_train_augmented.append((augment_transform(img), label))
-   
+
     while len(out_train_augmented) != len(in_train_augmented):
 
       if len(out_train_augmented) < len(in_train_augmented):
@@ -320,6 +317,9 @@ def compute_accuracy(path_to_eval_folder, model):
   total = 0
   categorise_correct = 0
   categorise_total = 0
+  # Conditional accuracy: accuracy for correctly categorized images
+  conditional_correct = 0
+  conditional_total = 0
 
   # Process in batches (more efficient)
   batch_size = 32
@@ -341,13 +341,23 @@ def compute_accuracy(path_to_eval_folder, model):
       images_to_classify = []
       labels_to_classify = []
       indices_to_guess = []
-      
+      # Track which indices are actually the correct category for conditional accuracy
+      correct_category_indices_classify = []
+      correct_category_indices_guess = []
       for idx in range(len(images)):
+        print(predicted_categorise[idx])
         if predicted_categorise[idx] == 0:  # In-domain
           images_to_classify.append(images[idx])
           labels_to_classify.append(labels[idx])
+          # Track if this was correctly categorized as 0
+          if true_category == 0:
+            correct_category_indices_classify.append(len(images_to_classify) - 1)
         else:  # Out-domain
           indices_to_guess.append(idx)
+          # Track if this was correctly categorized as 1
+          if true_category == 1:
+            correct_category_indices_guess.append(len(indices_to_guess) - 1)
+      
       
       # For in-domain images: classify them
       if len(images_to_classify) > 0:
@@ -357,6 +367,13 @@ def compute_accuracy(path_to_eval_folder, model):
         _, predicted = torch.max(outputs.data, 1)
         correct += (predicted == labels_to_classify_tensor).sum().item()
         total += len(images_to_classify)
+        
+        # Conditional accuracy: only for correctly categorized as 0
+        if len(correct_category_indices_classify) > 0:
+          conditional_predicted = predicted[correct_category_indices_classify]
+          conditional_labels = labels_to_classify_tensor[correct_category_indices_classify]
+          conditional_correct += (conditional_predicted == conditional_labels).sum().item()
+          conditional_total += len(correct_category_indices_classify)
       
       # For out-domain images: just guess randomly
       # For out-domain images: guess the least likely class (intentionally wrong)
@@ -374,12 +391,21 @@ def compute_accuracy(path_to_eval_folder, model):
         
         # Check accuracy (will be intentionally low)
         correct += (least_likely == labels_to_guess).sum().item()
-        total += len(indices_to_guess)  
+        total += len(indices_to_guess)
+        
+        # Conditional accuracy: only for correctly categorized as 1
+        if len(correct_category_indices_guess) > 0:
+          conditional_least_likely = least_likely[correct_category_indices_guess]
+          conditional_labels_guess = labels_to_guess[correct_category_indices_guess]
+          conditional_correct += (conditional_least_likely == conditional_labels_guess).sum().item()
+          conditional_total += len(correct_category_indices_guess)  
   # Calculate accuracies
   accuracy = correct / total
   categorise_accuracy = categorise_correct / categorise_total
+  conditional_accuracy = conditional_correct / conditional_total if conditional_total > 0 else 0.0
   
-  print(f"Categorization accuracy: {categorise_accuracy:.4f}")
+  print(f"\nCategorization accuracy: {categorise_accuracy:.4f}")
+  print(f"Conditional accuracy (correctly categorized only): {conditional_accuracy:.4f}")
 
   return accuracy
 
