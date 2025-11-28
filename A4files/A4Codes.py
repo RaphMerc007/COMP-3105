@@ -108,7 +108,7 @@ def learn(path_to_in_domain, path_to_out_domain):
     transformed_img = no_augment_transform(img)
     out_train_augmented.append(transformed_img)
   
-  for _ in range(6):
+  for _ in range(3):
     # augment the in-domain data
     for img, label in in_train:
       in_train_augmented.append((augment_transform(img), label))
@@ -133,115 +133,6 @@ def learn(path_to_in_domain, path_to_out_domain):
   print(f"Augmented dataset created: {len(in_train_augmented)} in-domain images, {len(out_train_augmented)} out-domain images")
 
 
-  # create the categorisation trainingdata 
-  # 0 -> in-domain, 1 -> out-domain
-  categorise_data_train = []
-  for (image, _) in in_train_augmented:
-    categorise_data_train.append((image, 0))
-  
-  for image in out_train_augmented:
-    categorise_data_train.append((image, 1))
-
-  print("data loaded")
-
-
-
-
-
-  #============================= Categorisation Model =======================================
-
-  # create the categorisation model
-  device_categorise = torch.device( "cuda" if torch.cuda.is_available() else "cpu")
-  model_categorise = resnet18(weights=None) # not allowed to use pretrained model
-  model_categorise.fc = nn.Sequential(
-    nn.Dropout(0.5),
-    nn.Linear(model_categorise.fc.in_features, 2)
-  )
-  model_categorise = model_categorise.to(device_categorise)
-  
-  criterion_categorise = nn.CrossEntropyLoss()
-  optimizer_categorise = optim.Adam(model_categorise.parameters(), lr=0.002, weight_decay=0.0001)
-  scheduler_categorise = optim.lr_scheduler.StepLR(optimizer_categorise, step_size=16, gamma=0.5)
-  
-  model_categorise.train()
-  # Convergence check parameters
-  best_acc_categorise = 0.0 # best accuracy so far
-  patience_categorise = 10  # amount of epochs to wait for improvement
-  no_improve_categorise = 0 # amount of epochs without improvement
-  min_improvement = 0.002  # Only count improvements > 0.2% as meaningful
-
-
-  batch_size = 64
-
-  try:
-    # epoch num is dynamic; stops when convergence is reached
-    for epoch in range(100):
-      # Shuffle data
-      import random
-      random.shuffle(categorise_data_train)
-      correct = 0
-      total = 0
-
-
-      # Process in batches
-      for i in range(0, len(categorise_data_train), batch_size):
-        batch = categorise_data_train[i:i+batch_size]
-
-        image_list = []
-        label_list = []
-
-        for img, label in batch:
-            image_list.append(img)
-            label_list.append(label)
-
-        images = torch.stack(image_list).to(device_categorise)
-        labels = torch.tensor(label_list).to(device_categorise)
-
-
-        # Train
-        optimizer_categorise.zero_grad()
-        outputs = model_categorise(images)
-        loss = criterion_categorise(outputs, labels)
-        loss.backward()
-        optimizer_categorise.step()
-
-
-        total += labels.size(0)
-        _, predicted = torch.max(outputs.data, 1) # get the predicted class
-        correct += (predicted == labels).sum().item() # count the correct predictions
-
-      scheduler_categorise.step()
-      current_acc = correct / total
-      
-      # Convergence check with meaningful improvement threshold
-      improvement = current_acc - best_acc_categorise
-      if improvement > min_improvement:
-        best_acc_categorise = current_acc
-        no_improve_categorise = 0
-        print(f"epoch {epoch+1} → New best accuracy: {best_acc_categorise:.4f} (+{improvement:.4f})")
-      else:
-        no_improve_categorise += 1
-        print(f"epoch {epoch+1} → No improvement for {no_improve_categorise} epochs (best: {best_acc_categorise:.4f}, current: {current_acc:.4f})")
-      
-      # Early stop if accuracy is very high (likely overfitting)
-      if current_acc > 0.98:
-        print(f"\nepoch {epoch+1} → High accuracy reached ({current_acc:.4f}), stopping to prevent overfitting.")
-        break
-        
-      if no_improve_categorise >= patience_categorise:
-        print(f"\nepoch {epoch+1} → Convergence reached! No improvement for {patience_categorise} epochs. Stopping training.")
-        print(f"epoch {epoch+1} → Best accuracy: {best_acc_categorise:.4f}")
-        break
-
-
-  except KeyboardInterrupt:
-    print(" Categorisation model trained")
-
-  print(" Moving to classify")
-
-
-
-
 
   #============================= Classification Model =======================================
 
@@ -256,81 +147,137 @@ def learn(path_to_in_domain, path_to_out_domain):
 
   criterion_classify = nn.CrossEntropyLoss()
   optimizer_classify = optim.Adam(model_classify.parameters(), lr=0.002, weight_decay=0.0001)
-  scheduler_classify = optim.lr_scheduler.StepLR(optimizer_classify, step_size=8, gamma=0.5)
+  scheduler_classify = optim.lr_scheduler.StepLR(optimizer_classify, step_size=8, gamma=0.6)
 
   # Use the pre-augmented in-domain data
   model_classify.train()
   # Convergence check parameters
-  best_acc_classify = 0.0 # best accuracy so far
-  patience_classify = 6  # amount of epochs to wait for improvement
-  no_improve_classify = 0 # amount of epochs without improvement
+  batch_size = 64
+  patience_classify = 20  # amount of epochs to wait for improvement
   min_improvement_classify = 0.002  # Only count improvements > 0.2% as meaningful
 
   try:
-    for epoch in range(100):
-      # Shuffle data
-      import random
-      random.shuffle(in_train_augmented)
-      correct = 0
-      total = 0
+    for n in range(5):
+      best_acc_classify = 0.0 # best accuracy so far
+      no_improve_classify = 0 # amount of epochs without improvement
+      for epoch in range(100):
+        # Shuffle data
+        import random
+        random.shuffle(in_train_augmented)
+        correct = 0
+        total = 0
 
 
-      # Process in batches
-      for i in range(0, len(in_train_augmented), batch_size):
-        batch = in_train_augmented[i:i+batch_size]
+        # Process in batches
+        for i in range(0, len(in_train_augmented), batch_size):
+          batch = in_train_augmented[i:i+batch_size]
 
-        image_list = []
-        label_list = []
-        for img, label in batch:
-          image_list.append(img)
-          label_list.append(label)
+          image_list = []
+          label_list = []
+          for img, label in batch:
+            image_list.append(img)
+            label_list.append(label)
 
-        images = torch.stack(image_list).to(device_classify)
-        labels = torch.tensor(label_list).to(device_classify)
+          images = torch.stack(image_list).to(device_classify)
+          labels = torch.tensor(label_list).to(device_classify)
 
-        # Train
-        optimizer_classify.zero_grad()
-        outputs = model_classify(images)
-        loss = criterion_classify(outputs, labels)
-        loss.backward()
-        optimizer_classify.step()
+          # Train
+          optimizer_classify.zero_grad()
+          outputs = model_classify(images)
+          loss = criterion_classify(outputs, labels)
+          loss.backward()
+          optimizer_classify.step()
 
-        # Calculate accuracy training
-        total += labels.size(0)
-        _, predicted = torch.max(outputs.data, 1) # get the predicted class
-        correct += (predicted == labels).sum().item()
+          # Calculate accuracy training
+          total += labels.size(0)
+          _, predicted = torch.max(outputs.data, 1) # get the predicted class
+          correct += (predicted == labels).sum().item()
 
-      scheduler_classify.step()
-      current_acc = correct / total
-      
-      # Convergence check with meaningful improvement threshold
-      improvement = current_acc - best_acc_classify
-      if improvement > min_improvement_classify:
-        best_acc_classify = current_acc
-        no_improve_classify = 0
-        print(f"epoch {epoch+1} → New best accuracy: {best_acc_classify:.4f} (+{improvement:.4f})")
-      else:
-        no_improve_classify += 1
-        print(f"epoch {epoch+1} → No improvement for {no_improve_classify} epochs (best: {best_acc_classify:.4f}, current: {current_acc:.4f})")
-      
-      # Early stop if accuracy is very high (likely overfitting)
-      if current_acc > 0.99:
-        print(f"\nepoch {epoch+1} → High accuracy reached ({current_acc:.4f}), stopping to prevent overfitting.")
-        break
+        scheduler_classify.step()
+        current_acc = correct / total
         
-      if no_improve_classify >= patience_classify:
-        print(f"\nepoch {epoch+1} → Convergence reached! No improvement for {patience_classify} epochs. Stopping training.")
-        print(f"epoch {epoch+1} → Best accuracy: {best_acc_classify:.4f}")
-        break
+        # Convergence check with meaningful improvement threshold
+        improvement = current_acc - best_acc_classify
+        if improvement > min_improvement_classify:
+          best_acc_classify = current_acc
+          no_improve_classify = 0
+          print(f"epoch {epoch+1} → New best accuracy: {best_acc_classify:.4f} (+{improvement:.4f})")
+        else:
+          no_improve_classify += 1
+          print(f"epoch {epoch+1} → No improvement for {no_improve_classify} epochs (best: {best_acc_classify:.4f}, current: {current_acc:.4f})")
+        
+        # Early stop if accuracy is very high (likely overfitting)
+        if current_acc > 0.99:
+          print(f"\nepoch {epoch+1} → High accuracy reached ({current_acc:.4f}), stopping to prevent overfitting.")
+          break
+          
+        if no_improve_classify >= patience_classify:
+          print(f"\nepoch {epoch+1} → Convergence reached! No improvement for {patience_classify} epochs. Stopping training.")
+          print(f"epoch {epoch+1} → Best accuracy: {best_acc_classify:.4f}")
+          break
+
+      if n == 4:
+        continue
+
+      # Test on in-domain eval
+      in_acc = compute_accuracy('./A4data/in-domain-eval', ModelWrapper(model_classify, None, class_to_idx, num_classes))
+      print(f"In-domain accuracy: {in_acc:.4f}")
+
+      # Test on out-domain eval
+      out_acc = compute_accuracy('./A4data/out-domain-eval', ModelWrapper(model_classify, None, class_to_idx, num_classes))
+      print(f"Out-domain accuracy: {out_acc:.4f}")
+
+      time_end = time.time()
+      print(f"Time taken: {(time_end - time_start)/60:.2f} minutes")
+      model_classify.train()
+
+      # Adversarial training on out-domain: train model to predict least likely class
+      for epoch in range(20):
+        # Shuffle data
+        import random
+        random.shuffle(out_train_augmented)
+        correct = 0
+        total = 0
+
+        # Process in batches
+        for i in range(0, len(out_train_augmented), batch_size):
+          batch = out_train_augmented[i:i+batch_size]
+
+          image_list = []
+          for img in batch:
+            image_list.append(img)
+
+          images = torch.stack(image_list).to(device_classify)
+
+          # Train adversarially: make model predict least likely class
+          optimizer_classify.zero_grad()
+          outputs = model_classify(images)
+          
+          # Get the least likely class (minimum probability) for each image
+          _, fake_labels = torch.min(outputs.data, 1)  # get the least likely class
+          
+          # Compute loss with fake labels (adversarial training)
+          loss = criterion_classify(outputs, fake_labels)
+          loss.backward()
+          optimizer_classify.step()
+
+          # Track what we're doing (for debugging)
+          total += images.size(0)
+          _, predicted = torch.min(outputs.data, 1)  # get the least likely class
+          correct += (predicted == fake_labels).sum().item()
+
+        scheduler_classify.step()
+        current_acc = correct / total if total > 0 else 0.0
+        
+        print(f"Out-domain epoch {epoch+1} → Adversarial accuracy: {current_acc:.4f}")
 
   except KeyboardInterrupt:
     print(" Moving to test")
 
   model_classify.eval()
-  model_categorise.eval()
   
   # Return wrapped model
-  return ModelWrapper(model_classify, model_categorise, class_to_idx, num_classes)
+  return ModelWrapper(model_classify, None, class_to_idx, num_classes)
 
 
 
@@ -341,7 +288,6 @@ def learn(path_to_in_domain, path_to_out_domain):
 def compute_accuracy(path_to_eval_folder, model):
   # Extract models and class info from wrapper
   model_classify = model.model_classify
-  model_categorise = model.model_categorise
   class_to_idx = model.class_to_idx
   num_classes = model.num_classes
   
@@ -354,11 +300,8 @@ def compute_accuracy(path_to_eval_folder, model):
       eval_data.append((transformed_img, label))
 
   device_classify = torch.device( "cuda" if torch.cuda.is_available() else "cpu")
-  device_categorise = torch.device( "cuda" if torch.cuda.is_available() else "cpu")
   model_classify = model_classify.to(device_classify)
-  model_categorise = model_categorise.to(device_categorise)
   model_classify.eval()  # Set to evaluation mode
-  model_categorise.eval()  # Set to evaluation mode
 
   # Determine true category label (0 for in-domain, 1 for out-domain)
   true_category = 0 if "in-domain" in path_to_eval_folder else 1
@@ -366,11 +309,6 @@ def compute_accuracy(path_to_eval_folder, model):
   # Evaluate model
   correct = 0
   total = 0
-  categorise_correct = 0
-  categorise_total = 0
-  # Conditional accuracy: accuracy for correctly categorized images
-  conditional_correct = 0
-  conditional_total = 0
 
   # Process in batches (more efficient)
   batch_size = 32
@@ -383,104 +321,34 @@ def compute_accuracy(path_to_eval_folder, model):
       for img, label in batch:
           image_list.append(img)
           label_list.append(label)
-      images = torch.stack(image_list).to(device_categorise)
+      images = torch.stack(image_list).to(device_classify)
       labels = torch.tensor(label_list).to(device_classify)
       
       # First, determine if each image is in-domain or out-domain
-      categorise_outputs = model_categorise(images)
-      _, predicted_categorise = torch.max(categorise_outputs.data, 1) # get the predicted class
-      
-      # Track categorization accuracy
-      categorise_total += len(images)
-      categorise_correct += (predicted_categorise == true_category).sum().item() # count the correct predictions
+      outputs = model_classify(images)
+      _, predicted = torch.max(outputs.data, 1) # get the predicted class
       
       # Separate images and labels based on in/out domain prediction
-      images_to_classify = []
-      labels_to_classify = []
-      indices_to_guess = []
-      # Track which indices are actually the correct category for conditional accuracy
-      correct_category_indices_classify = []
-      correct_category_indices_guess = []
 
-
-      for idx in range(len(images)):
-        if predicted_categorise[idx] == 0:  # In-domain
-          images_to_classify.append(images[idx])
-          labels_to_classify.append(labels[idx])
-          # Track if this was correctly categorized as 0
-          if true_category == 0:
-            correct_category_indices_classify.append(len(images_to_classify) - 1)
-        else:  # Out-domain
-          indices_to_guess.append(idx)
-          # Track if this was correctly categorized as 1
-          if true_category == 1:
-            correct_category_indices_guess.append(len(indices_to_guess) - 1)
       
       
+
       # For in-domain images: classify them
-      if len(images_to_classify) > 0:
-        images_to_classify_tensor = torch.stack(images_to_classify).to(device_classify)
-        labels_to_classify_tensor = torch.tensor(labels_to_classify).to(device_classify)
+      images_to_classify_tensor = images 
+      labels_to_classify_tensor = labels 
+      
+      outputs = model_classify(images_to_classify_tensor)
+      _, predicted = torch.max(outputs.data, 1)
 
-        outputs = model_classify(images_to_classify_tensor)
-        _, predicted = torch.max(outputs.data, 1)
-
-        correct += (predicted == labels_to_classify_tensor).sum().item()
-        total += len(images_to_classify)
+      correct += (predicted == labels_to_classify_tensor).sum().item()
+      total += len(images)
         
-        # Conditional accuracy: only for correctly categorized as 0
-        if len(correct_category_indices_classify) > 0:
-          conditional_predicted = predicted[correct_category_indices_classify]
-          conditional_labels = labels_to_classify_tensor[correct_category_indices_classify]
-          conditional_correct += (conditional_predicted == conditional_labels).sum().item()
-          conditional_total += len(correct_category_indices_classify)
 
           
-      
-      # For out-domain images: just guess randomly
-      # For out-domain images: guess the least likely class (intentionally wrong)
-      if len(indices_to_guess) > 0:
-        # Stack images that need guessing
-        # Prepare tensors for out-domain images to be guessed
-        images_to_guess_list = []
-        labels_to_guess_list = []
-
-        for idx in indices_to_guess:
-          images_to_guess_list.append(images[idx])
-          labels_to_guess_list.append(labels[idx])
-
-        images_to_guess = torch.stack(images_to_guess_list).to(device_classify)
-        labels_to_guess = torch.tensor(labels_to_guess_list).to(device_classify)
-        
-
-        # Get classification probabilities
-        guess_outputs = model_classify(images_to_guess)
-        guess_probs = torch.softmax(guess_outputs, dim=1)
-        
-        # Guess the least likely class (argmin instead of argmax)
-        _, least_likely = torch.min(guess_probs, dim=1)
-        
-        # Check accuracy (will be intentionally low)
-        correct += (least_likely == labels_to_guess).sum().item()
-        total += len(indices_to_guess)
-        
-        # Conditional accuracy: only for correctly categorized as 1
-        if len(correct_category_indices_guess) > 0:
-          conditional_least_likely = least_likely[correct_category_indices_guess]
-          conditional_labels_guess = labels_to_guess[correct_category_indices_guess]
-          conditional_correct += (conditional_least_likely == conditional_labels_guess).sum().item()
-          conditional_total += len(correct_category_indices_guess)  
-
-
+    
 
   # Calculate accuracies
   accuracy = correct / total
-  categorise_accuracy = categorise_correct / categorise_total
-  conditional_accuracy = conditional_correct / conditional_total if conditional_total > 0 else 0.0
-  
-  
-  print(f"\nCategorization accuracy: {categorise_accuracy:.4f}")
-  print(f"Conditional accuracy (correctly categorized only): {conditional_accuracy:.4f}")
 
   return accuracy
 
