@@ -18,7 +18,7 @@ class ModelWrapper:
     self.num_classes = num_classes
 
 
-def get_transforms(augment):
+def get_transforms(augment, normalize=False):
   if augment:
     # Training transforms with aggressive data augmentation
     transform = transforms.Compose([
@@ -35,6 +35,8 @@ def get_transforms(augment):
       transforms.Resize((224, 224)),
       transforms.ToTensor(),
     ])
+    if normalize:
+      transform.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
   return transform
 
 
@@ -98,18 +100,13 @@ def learn(path_to_in_domain, path_to_out_domain):
   
   print("Creating augmented dataset...")
   # Start with non-augmented versions
-  in_train_augmented = []
-  for img, label in in_train:
-    transformed_img = no_augment_transform(img)
-    in_train_augmented.append((transformed_img, label))
+  in_train_augmented = [(no_augment_transform(img), label) for img, label in in_train]
+  out_train_augmented = [no_augment_transform(img) for img in out_train]
   
-  out_train_augmented = []
-  for img in out_train:
-    transformed_img = no_augment_transform(img)
-    out_train_augmented.append(transformed_img)
-  
-  for _ in range(6):
-    # augment the in-domain data
+  for i in range(6):
+    if i == 5:
+      augment_transform = get_transforms(True, True)
+      
     for img, label in in_train:
       in_train_augmented.append((augment_transform(img), label))
 
@@ -129,7 +126,7 @@ def learn(path_to_in_domain, path_to_out_domain):
           in_train_augmented.append((augment_transform(img), label))
           if len(out_train_augmented) <= len(in_train_augmented):
             break
-
+  
   print(f"Augmented dataset created: {len(in_train_augmented)} in-domain images, {len(out_train_augmented)} out-domain images")
 
 
@@ -172,7 +169,7 @@ def learn(path_to_in_domain, path_to_out_domain):
 
 
   batch_size = 64
-
+  
   try:
     # epoch num is dynamic; stops when convergence is reached
     for epoch in range(100):
@@ -186,17 +183,8 @@ def learn(path_to_in_domain, path_to_out_domain):
       # Process in batches
       for i in range(0, len(categorise_data_train), batch_size):
         batch = categorise_data_train[i:i+batch_size]
-
-        image_list = []
-        label_list = []
-
-        for img, label in batch:
-            image_list.append(img)
-            label_list.append(label)
-
-        images = torch.stack(image_list).to(device_categorise)
-        labels = torch.tensor(label_list).to(device_categorise)
-
+        images = torch.stack([img for img, _ in batch]).to(device_categorise)
+        labels = torch.tensor([label for _, label in batch]).to(device_categorise)
 
         # Train
         optimizer_categorise.zero_grad()
@@ -278,15 +266,8 @@ def learn(path_to_in_domain, path_to_out_domain):
       # Process in batches
       for i in range(0, len(in_train_augmented), batch_size):
         batch = in_train_augmented[i:i+batch_size]
-
-        image_list = []
-        label_list = []
-        for img, label in batch:
-          image_list.append(img)
-          label_list.append(label)
-
-        images = torch.stack(image_list).to(device_classify)
-        labels = torch.tensor(label_list).to(device_classify)
+        images = torch.stack([img for img, _ in batch]).to(device_classify)
+        labels = torch.tensor([label for _, label in batch]).to(device_classify)
 
         # Train
         optimizer_classify.zero_grad()
@@ -314,9 +295,9 @@ def learn(path_to_in_domain, path_to_out_domain):
         print(f"epoch {epoch+1} → No improvement for {no_improve_classify} epochs (best: {best_acc_classify:.4f}, current: {current_acc:.4f})")
       
       # Early stop if accuracy is very high (likely overfitting)
-      if current_acc > 0.99:
-        print(f"\nepoch {epoch+1} → High accuracy reached ({current_acc:.4f}), stopping to prevent overfitting.")
-        break
+      # if current_acc > 0.99:
+      #   print(f"\nepoch {epoch+1} → High accuracy reached ({current_acc:.4f}), stopping to prevent overfitting.")
+      #   break
         
       if no_improve_classify >= patience_classify:
         print(f"\nepoch {epoch+1} → Convergence reached! No improvement for {patience_classify} epochs. Stopping training.")
@@ -348,10 +329,7 @@ def compute_accuracy(path_to_eval_folder, model):
   eval_data_pil = load_data(path_to_eval_folder, True, class_to_idx)
   # Transform PIL images to tensors
   eval_transform = get_transforms(False)
-  eval_data = []
-  for img, label in eval_data_pil:
-      transformed_img = eval_transform(img)
-      eval_data.append((transformed_img, label))
+  eval_data = [(eval_transform(img), label) for img, label in eval_data_pil]
 
   device_classify = torch.device( "cuda" if torch.cuda.is_available() else "cpu")
   device_categorise = torch.device( "cuda" if torch.cuda.is_available() else "cpu")
@@ -377,14 +355,8 @@ def compute_accuracy(path_to_eval_folder, model):
   with torch.no_grad():  # Don't compute gradients during evaluation
     for i in range(0, len(eval_data), batch_size):
       batch = eval_data[i:i+batch_size]
-      # Expand batch processing: extract images and labels with extra checks, convert to tensors, and move to the required devices.
-      image_list = []
-      label_list = []
-      for img, label in batch:
-          image_list.append(img)
-          label_list.append(label)
-      images = torch.stack(image_list).to(device_categorise)
-      labels = torch.tensor(label_list).to(device_classify)
+      images = torch.stack([img for img, _ in batch]).to(device_categorise)
+      labels = torch.tensor([label for _, label in batch]).to(device_classify)
       
       # First, determine if each image is in-domain or out-domain
       categorise_outputs = model_categorise(images)
@@ -441,18 +413,9 @@ def compute_accuracy(path_to_eval_folder, model):
       # For out-domain images: guess the least likely class (intentionally wrong)
       if len(indices_to_guess) > 0:
         # Stack images that need guessing
-        # Prepare tensors for out-domain images to be guessed
-        images_to_guess_list = []
-        labels_to_guess_list = []
-
-        for idx in indices_to_guess:
-          images_to_guess_list.append(images[idx])
-          labels_to_guess_list.append(labels[idx])
-
-        images_to_guess = torch.stack(images_to_guess_list).to(device_classify)
-        labels_to_guess = torch.tensor(labels_to_guess_list).to(device_classify)
+        images_to_guess = torch.stack([images[idx] for idx in indices_to_guess]).to(device_classify)
+        labels_to_guess = torch.tensor([labels[idx] for idx in indices_to_guess]).to(device_classify)
         
-
         # Get classification probabilities
         guess_outputs = model_classify(images_to_guess)
         guess_probs = torch.softmax(guess_outputs, dim=1)
