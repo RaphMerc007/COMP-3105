@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
+import matplotlib.pyplot as plt
 from torchvision.models import resnet18
 from PIL import Image
 
@@ -160,13 +161,18 @@ def learn(path_to_in_domain, path_to_out_domain):
     for n in range(5):
       best_acc_classify = 0.0 # best accuracy so far
       no_improve_classify = 0 # amount of epochs without improvement
+
+      # in domain training loop
       for epoch in range(100):
         # Shuffle data
         import random
         random.shuffle(in_train_augmented)
         correct = 0
         total = 0
-
+        ce_loss_epoch = 0
+        batch_count = 0
+        entropy_epoch = 0
+        conf_epoch = 0
 
         # Process in batches
         for i in range(0, len(in_train_augmented), batch_size):
@@ -188,6 +194,10 @@ def learn(path_to_in_domain, path_to_out_domain):
           loss.backward()
           optimizer_classify.step()
 
+          # Accumulate graph metrics
+          ce_loss_epoch += loss.item()
+          batch_count += 1
+
           # Calculate accuracy training
           total += labels.size(0)
           _, predicted = torch.max(outputs.data, 1) # get the predicted class
@@ -195,7 +205,27 @@ def learn(path_to_in_domain, path_to_out_domain):
 
         scheduler_classify.step()
         current_acc = correct / total
-        
+
+        # Avg metrics
+        train_acc_history.append(current_acc)
+
+        avg_ce = ce_loss_epoch / batch_count
+        in_ce_loss_history.append(avg_ce)
+
+        with torch.no_grad():
+          ood_images = torch.stack(out_train_augmented[:256]).to(device_classify)
+
+          ood_logits = model_classify(ood_images)
+          probs = torch.softmax(ood_logits, dim=1)
+
+          # entropy
+          entropy = -torch.sum(probs * torch.log(probs + 1e-8), dim=1)
+          out_entropy_history.append(entropy.mean().item())
+
+          # confidence
+          conf = probs.max(dim=1)[0]
+          out_conf_history.append(conf.mean().item())
+
         # Convergence check with meaningful improvement threshold
         improvement = current_acc - best_acc_classify
         if improvement > min_improvement_classify:
@@ -238,6 +268,10 @@ def learn(path_to_in_domain, path_to_out_domain):
         random.shuffle(out_train_augmented)
         correct = 0
         total = 0
+        epoch_loss = 0
+        batch_count = 0
+        epoch_entropy = 0
+        epoch_conf = 0
 
         # Process in batches
         for i in range(0, len(out_train_augmented), batch_size):
@@ -261,6 +295,16 @@ def learn(path_to_in_domain, path_to_out_domain):
           loss.backward()
           optimizer_classify.step()
 
+          # Accumulate graph metrics (per batch)
+          epoch_loss += loss.item()
+          batch_count += 1
+
+          # Log out domain entropy and confidence
+          with torch.no_grad():
+            probs = torch.softmax(outputs, dim=1)
+            epoch_entropy += (-torch.sum(probs * torch.log(probs + 1e-8), dim=1)).mean().item()
+            epoch_conf += probs.max(dim=1)[0].mean().item()
+
           # Track what we're doing (for debugging)
           total += images.size(0)
           _, predicted = torch.min(outputs.data, 1)  # get the least likely class
@@ -268,7 +312,10 @@ def learn(path_to_in_domain, path_to_out_domain):
 
         scheduler_classify.step()
         current_acc = correct / total if total > 0 else 0.0
-        
+
+        # Average metrics of batch
+        adv_ce_loss_history.append(epoch_loss / batch_count)
+        adv_accuracy_history.append(correct / total)
         print(f"Out-domain epoch {epoch+1} → Adversarial accuracy: {current_acc:.4f}")
 
   except KeyboardInterrupt:
@@ -361,9 +408,86 @@ def compute_accuracy(path_to_eval_folder, model):
 import time
 time_start = time.time()
 
-
+# Graph code
+train_acc_history = []
+in_ce_loss_history = []
+out_entropy_history = []
+out_conf_history = []
+adv_accuracy_history = []
+adv_ce_loss_history = []
 
 model = learn('./A4data/in-domain-train', './A4data/out-domain-train')
+
+#Plot training accuracy over epochs
+epochs = range(1, len(train_acc_history) + 1)
+
+plt.figure(figsize=(8, 5))
+plt.plot(epochs, train_acc_history, marker='o', label="Train Accuracy")
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.title("In-Domain training Accuracy Over Epochs")
+plt.legend()
+plt.grid(alpha=0.3)
+plt.tight_layout()
+plt.savefig("/home/student/3105/A4files/train_accuracy.png")
+plt.close()
+
+#Plot CE loss per epoch
+plt.figure(figsize=(8,5))
+plt.plot(epochs, in_ce_loss_history, marker='o', label="Cross-Entropy Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("In-Domain CE Loss Over Epochs")
+plt.grid(alpha=0.3)
+plt.tight_layout()
+plt.savefig("/home/student/3105/A4files/CE_Loss.png")
+plt.close()
+
+# Plot entropy loss per epoch (non negated)
+plt.figure(figsize=(8,5))
+plt.plot(epochs, out_entropy_history, marker='o', label="Out-Domain Entropy")
+plt.xlabel("Epoch")
+plt.ylabel("Entropy")
+plt.title("Out-Domain Entropy Over Epochs")
+plt.grid(alpha=0.3)
+plt.tight_layout()
+plt.savefig("/home/student/3105/A4files/Entropy_loss.png")
+plt.close()
+
+# Plot out domain confidence
+plt.figure(figsize=(8,5))
+plt.plot(epochs, out_conf_history, marker='o', label="Out-Domain Confidence")
+plt.xlabel("Epoch")
+plt.ylabel("Avg Max Softmax Probability")
+plt.title("Out-Domain Confidence Over Epochs")
+plt.grid(alpha=0.3)
+plt.tight_layout()
+plt.savefig("/home/student/3105/A4files/domain_confidence.png")
+plt.close()
+
+# The following 2 are broken for the time being
+# Plot adversarial training accuracy
+# plt.figure(figsize=(8,5))
+# plt.plot(epochs, adv_accuracy_history, marker='o', label="Adversarial Accuracy")
+# plt.xlabel("Epoch")
+# plt.ylabel("Accuracy")
+# plt.title("Adversarial Training Accuracy Over Epochs")
+# plt.grid(alpha=0.3)
+# plt.tight_layout()
+# plt.savefig("/home/student/3105/A4files/adv_accuracy.png")
+# plt.close()
+
+# # Plot adversarial training CE loss
+# plt.figure(figsize=(8,5))
+# plt.plot(epochs, adv_ce_loss_history, marker='o', label="Adversarial CE Loss")
+# plt.xlabel("Epoch")
+# plt.ylabel("Cross-Entropy Loss")
+# plt.title("Adversarial Training CE Loss Over Epochs")
+# plt.grid(alpha=0.3)
+# plt.tight_layout()
+# plt.savefig("/home/student/3105/A4files/adv_ce_loss.png")
+# plt.close()
+
 
 # Test on in-domain eval
 in_acc = compute_accuracy('./A4data/in-domain-eval', model)
