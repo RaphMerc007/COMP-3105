@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
+import matplotlib.pyplot as plt
 from torchvision.models import resnet18
 from PIL import Image
 
@@ -151,6 +152,8 @@ def learn(path_to_in_domain, path_to_out_domain):
   min_improvement = 0.002
   entropy_weight = 0.2  # Weight for entropy loss (can tune this)
 
+
+
   try:
     best_acc = 0.0
     no_improve = 0
@@ -163,6 +166,10 @@ def learn(path_to_in_domain, path_to_out_domain):
       correct = 0
       total = 0
       total_loss = 0.0
+
+      epoch_ce_loss = 0.0
+      epoch_entropy_loss = 0.0
+      epoch_out_conf = 0.0
 
       # Process in batches - alternate between in-domain and out-domain
       num_batches = max(len(in_train_augmented), len(out_train_augmented)) // batch_size
@@ -201,6 +208,19 @@ def learn(path_to_in_domain, path_to_out_domain):
         # Out-domain: maximize entropy (minimize negative entropy)
         out_outputs = model(out_images_tensor)
         out_entropy = compute_entropy(out_outputs)
+
+        batch_ce_loss = in_loss.item()
+        batch_entropy_loss = out_entropy.item()
+
+        # Compute out-domain confidence (softmax max prob)
+        with torch.no_grad():
+            out_probs = torch.softmax(out_outputs, dim=1)
+            batch_max_conf = out_probs.max(dim=1).values.mean().item()
+
+        epoch_ce_loss += batch_ce_loss
+        epoch_entropy_loss += batch_entropy_loss
+        epoch_out_conf += batch_max_conf
+
         out_loss = -out_entropy  # Negative because we want to maximize entropy
         
         # Combined loss
@@ -217,6 +237,11 @@ def learn(path_to_in_domain, path_to_out_domain):
       scheduler.step()
       current_acc = correct / total
       avg_loss = total_loss / num_batches
+
+      train_acc_history.append(current_acc)
+      ce_loss_history.append(epoch_ce_loss / num_batches)
+      entropy_loss_history.append(epoch_entropy_loss / num_batches)
+      out_conf_history.append(epoch_out_conf / num_batches)
       
       # Convergence check
       improvement = current_acc - best_acc
@@ -241,6 +266,8 @@ def learn(path_to_in_domain, path_to_out_domain):
     print("Training interrupted")
 
   model.eval()
+
+
   return ModelWrapper(model, class_to_idx, num_classes)
 
 
@@ -303,9 +330,61 @@ def compute_accuracy(path_to_eval_folder, model):
 import time
 time_start = time.time()
 
-
+# Graph plot stuff
+train_acc_history = []
+ce_loss_history = []
+entropy_loss_history = []       # Out-domain entropy loss (positive, not negated)
+out_conf_history = []           # Avg out-domain confidence
 
 model = learn('./A4data/in-domain-train', './A4data/out-domain-train')
+
+#Plot training accuracy over epochs
+epochs = range(1, len(train_acc_history) + 1)
+
+plt.figure(figsize=(8, 5))
+plt.plot(epochs, train_acc_history, marker='o', label="Train Accuracy")
+plt.xlabel("Epoch")
+plt.ylabel("Accuracy")
+plt.title("In-Domain training Accuracy Over Epochs")
+plt.legend()
+plt.grid(alpha=0.3)
+plt.tight_layout()
+plt.savefig("/home/student/3105/A4files/train_accuracy.png")
+plt.close()
+
+#Plot CE loss per epoch
+plt.figure(figsize=(8,5))
+plt.plot(epochs, ce_loss_history, marker='o', label="Cross-Entropy Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("In-Domain CE Loss Over Epochs")
+plt.grid(alpha=0.3)
+plt.tight_layout()
+plt.savefig("/home/student/3105/A4files/CE_Loss.png")
+plt.close()
+
+# Plot entropy loss per epoch (non negated)
+plt.figure(figsize=(8,5))
+plt.plot(epochs, entropy_loss_history, marker='o', label="Out-Domain Entropy")
+plt.xlabel("Epoch")
+plt.ylabel("Entropy")
+plt.title("Out-Domain Entropy Over Epochs")
+plt.grid(alpha=0.3)
+plt.tight_layout()
+plt.savefig("/home/student/3105/A4files/Entropy_loss.png")
+plt.close()
+
+# Plot out domain confidence
+plt.figure(figsize=(8,5))
+plt.plot(epochs, out_conf_history, marker='o', label="Out-Domain Confidence")
+plt.xlabel("Epoch")
+plt.ylabel("Avg Max Softmax Probability")
+plt.title("Out-Domain Confidence Over Epochs")
+plt.grid(alpha=0.3)
+plt.tight_layout()
+plt.savefig("/home/student/3105/A4files/domain_confidence.png")
+plt.close()
+
 
 # Test on in-domain eval
 in_acc = compute_accuracy('./A4data/in-domain-eval', model)
