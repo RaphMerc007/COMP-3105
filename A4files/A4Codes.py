@@ -9,16 +9,15 @@ from PIL import Image
 
 
 
-# Wrapper class to hold both categorization and classification models
+# Wrapper class to hold the model
 class ModelWrapper:
-  def __init__(self, model_classify, model_categorise, class_to_idx, num_classes):
-    self.model_classify = model_classify
-    self.model_categorise = model_categorise
+  def __init__(self, model, class_to_idx, num_classes):
+    self.model = model
     self.class_to_idx = class_to_idx
     self.num_classes = num_classes
 
 
-def get_transforms(augment):
+def get_transforms(augment, normalize=False):
   if augment:
     # Training transforms with aggressive data augmentation
     transform = transforms.Compose([
@@ -35,6 +34,8 @@ def get_transforms(augment):
       transforms.Resize((224, 224)),
       transforms.ToTensor(),
     ])
+    if normalize:
+      transform.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
   return transform
 
 
@@ -85,7 +86,13 @@ def load_data(path, has_labels, class_to_idx=None):
 
 
 
-# train the model
+# Compute entropy of predictions (for entropy maximization)
+def compute_entropy(outputs):
+  probs = torch.nn.functional.softmax(outputs, dim=1)
+  entropy = -torch.sum(probs * torch.log(probs + 1e-8), dim=1)
+  return entropy.mean()
+
+# train the model using entropy-based approach
 def learn(path_to_in_domain, path_to_out_domain):
   # Discover classes dynamically from in-domain training data
   class_to_idx, num_classes = discover_classes(path_to_in_domain)
@@ -98,186 +105,143 @@ def learn(path_to_in_domain, path_to_out_domain):
   
   print("Creating augmented dataset...")
   # Start with non-augmented versions
-  in_train_augmented = []
-  for img, label in in_train:
-    transformed_img = no_augment_transform(img)
-    in_train_augmented.append((transformed_img, label))
+  in_train_augmented = [(no_augment_transform(img), label) for img, label in in_train]
+  out_train_augmented = [no_augment_transform(img) for img in out_train]
   
-  out_train_augmented = []
-  for img in out_train:
-    transformed_img = no_augment_transform(img)
-    out_train_augmented.append(transformed_img)
-  
-  for _ in range(3):
-    # augment the in-domain data
+  # Augment data
+  for i in range(6):
+    if i == 5:
+      augment_transform = get_transforms(True, True)
+      
     for img, label in in_train:
       in_train_augmented.append((augment_transform(img), label))
 
-    # make sure that the out-domain data is the same size as the in-domain data
+    # Balance out-domain data to match in-domain size
     while len(out_train_augmented) != len(in_train_augmented):
-
       if len(out_train_augmented) < len(in_train_augmented):
-        # add more out-domain data
         for img in out_train:
           out_train_augmented.append(augment_transform(img))
           if len(out_train_augmented) >= len(in_train_augmented):
             break
-          
       if len(out_train_augmented) > len(in_train_augmented):
-        # remove some in-domain data
         for img, label in in_train:
           in_train_augmented.append((augment_transform(img), label))
           if len(out_train_augmented) <= len(in_train_augmented):
             break
-
+  
   print(f"Augmented dataset created: {len(in_train_augmented)} in-domain images, {len(out_train_augmented)} out-domain images")
 
-
-
-  #============================= Classification Model =======================================
-
-  # create the classification model
-  device_classify = torch.device( "cuda" if torch.cuda.is_available() else "cpu")
-  model_classify = resnet18(weights=None) # not allowed to use pretrained model
-  model_classify.fc = nn.Sequential(
+  # Create single model
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  model = resnet18(weights=None)
+  model.fc = nn.Sequential(
     nn.Dropout(0.5),
-    nn.Linear(model_classify.fc.in_features, num_classes)
+    nn.Linear(model.fc.in_features, num_classes)
   )
-  model_classify = model_classify.to(device_classify)
+  model = model.to(device)
 
-  criterion_classify = nn.CrossEntropyLoss()
-  optimizer_classify = optim.Adam(model_classify.parameters(), lr=0.002, weight_decay=0.0001)
-  scheduler_classify = optim.lr_scheduler.StepLR(optimizer_classify, step_size=8, gamma=0.6)
+  # Loss functions
+  criterion_in = nn.CrossEntropyLoss()  # For in-domain: minimize cross-entropy
+  optimizer = optim.Adam(model.parameters(), lr=0.002, weight_decay=0.0001)
+  scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=8, gamma=0.6)
 
-  # Use the pre-augmented in-domain data
-  model_classify.train()
-  # Convergence check parameters
+  model.train()
   batch_size = 64
-  patience_classify = 20  # amount of epochs to wait for improvement
-  min_improvement_classify = 0.002  # Only count improvements > 0.2% as meaningful
+  patience = 20
+  min_improvement = 0.002
+  entropy_weight = 0.2  # Weight for entropy loss (can tune this)
 
   try:
-    for n in range(5):
-      best_acc_classify = 0.0 # best accuracy so far
-      no_improve_classify = 0 # amount of epochs without improvement
-      for epoch in range(100):
-        # Shuffle data
-        import random
-        random.shuffle(in_train_augmented)
-        correct = 0
-        total = 0
+    best_acc = 0.0
+    no_improve = 0
+    
+    for epoch in range(100):
+      import random
+      random.shuffle(in_train_augmented)
+      random.shuffle(out_train_augmented)
+      
+      correct = 0
+      total = 0
+      total_loss = 0.0
 
-
-        # Process in batches
-        for i in range(0, len(in_train_augmented), batch_size):
-          batch = in_train_augmented[i:i+batch_size]
-
-          image_list = []
-          label_list = []
-          for img, label in batch:
-            image_list.append(img)
-            label_list.append(label)
-
-          images = torch.stack(image_list).to(device_classify)
-          labels = torch.tensor(label_list).to(device_classify)
-
-          # Train
-          optimizer_classify.zero_grad()
-          outputs = model_classify(images)
-          loss = criterion_classify(outputs, labels)
-          loss.backward()
-          optimizer_classify.step()
-
-          # Calculate accuracy training
-          total += labels.size(0)
-          _, predicted = torch.max(outputs.data, 1) # get the predicted class
-          correct += (predicted == labels).sum().item()
-
-        scheduler_classify.step()
-        current_acc = correct / total
+      # Process in batches - alternate between in-domain and out-domain
+      num_batches = max(len(in_train_augmented), len(out_train_augmented)) // batch_size
+      
+      for batch_idx in range(num_batches):
+        # Get in-domain batch
+        in_start = (batch_idx * batch_size) % len(in_train_augmented)
+        in_batch = in_train_augmented[in_start:in_start + batch_size]
         
-        # Convergence check with meaningful improvement threshold
-        improvement = current_acc - best_acc_classify
-        if improvement > min_improvement_classify:
-          best_acc_classify = current_acc
-          no_improve_classify = 0
-          print(f"epoch {epoch+1} → New best accuracy: {best_acc_classify:.4f} (+{improvement:.4f})")
-        else:
-          no_improve_classify += 1
-          print(f"epoch {epoch+1} → No improvement for {no_improve_classify} epochs (best: {best_acc_classify:.4f}, current: {current_acc:.4f})")
+        in_images = []
+        in_labels = []
+        for img, label in in_batch:
+          in_images.append(img)
+          in_labels.append(label)
         
-        # Early stop if accuracy is very high (likely overfitting)
-        if current_acc > 0.99:
-          print(f"\nepoch {epoch+1} → High accuracy reached ({current_acc:.4f}), stopping to prevent overfitting.")
-          break
-          
-        if no_improve_classify >= patience_classify:
-          print(f"\nepoch {epoch+1} → Convergence reached! No improvement for {patience_classify} epochs. Stopping training.")
-          print(f"epoch {epoch+1} → Best accuracy: {best_acc_classify:.4f}")
-          break
+        in_images_tensor = torch.stack(in_images).to(device)
+        in_labels_tensor = torch.tensor(in_labels).to(device)
 
-      if n == 4:
-        continue
-
-      # Test on in-domain eval
-      in_acc = compute_accuracy('./A4data/in-domain-eval', ModelWrapper(model_classify, None, class_to_idx, num_classes))
-      print(f"In-domain accuracy: {in_acc:.4f}")
-
-      # Test on out-domain eval
-      out_acc = compute_accuracy('./A4data/out-domain-eval', ModelWrapper(model_classify, None, class_to_idx, num_classes))
-      print(f"Out-domain accuracy: {out_acc:.4f}")
-
-      time_end = time.time()
-      print(f"Time taken: {(time_end - time_start)/60:.2f} minutes")
-      model_classify.train()
-
-      # Adversarial training on out-domain: train model to predict least likely class
-      for epoch in range(20):
-        # Shuffle data
-        import random
-        random.shuffle(out_train_augmented)
-        correct = 0
-        total = 0
-
-        # Process in batches
-        for i in range(0, len(out_train_augmented), batch_size):
-          batch = out_train_augmented[i:i+batch_size]
-
-          image_list = []
-          for img in batch:
-            image_list.append(img)
-
-          images = torch.stack(image_list).to(device_classify)
-
-          # Train adversarially: make model predict least likely class
-          optimizer_classify.zero_grad()
-          outputs = model_classify(images)
-          
-          # Get the least likely class (minimum probability) for each image
-          _, fake_labels = torch.min(outputs.data, 1)  # get the least likely class
-          
-          # Compute loss with fake labels (adversarial training)
-          loss = criterion_classify(outputs, fake_labels)
-          loss.backward()
-          optimizer_classify.step()
-
-          # Track what we're doing (for debugging)
-          total += images.size(0)
-          _, predicted = torch.min(outputs.data, 1)  # get the least likely class
-          correct += (predicted == fake_labels).sum().item()
-
-        scheduler_classify.step()
-        current_acc = correct / total if total > 0 else 0.0
+        # Get out-domain batch
+        out_start = (batch_idx * batch_size) % len(out_train_augmented)
+        out_batch = out_train_augmented[out_start:out_start + batch_size]
         
-        print(f"Out-domain epoch {epoch+1} → Adversarial accuracy: {current_acc:.4f}")
+        out_images = []
+        for img in out_batch:
+          out_images.append(img)
+        
+        out_images_tensor = torch.stack(out_images).to(device)
+
+        # Forward pass and compute losses
+        optimizer.zero_grad()
+        
+        # In-domain: minimize cross-entropy (standard classification loss)
+        in_outputs = model(in_images_tensor)
+        in_loss = criterion_in(in_outputs, in_labels_tensor)
+        
+        # Out-domain: maximize entropy (minimize negative entropy)
+        out_outputs = model(out_images_tensor)
+        out_entropy = compute_entropy(out_outputs)
+        out_loss = -out_entropy  # Negative because we want to maximize entropy
+        
+        # Combined loss
+        loss = in_loss + entropy_weight * out_loss
+        loss.backward()
+        optimizer.step()
+
+        # Track accuracy (only on in-domain)
+        total += in_labels_tensor.size(0)
+        _, predicted = torch.max(in_outputs.data, 1)
+        correct += (predicted == in_labels_tensor).sum().item()
+        total_loss += loss.item()
+
+      scheduler.step()
+      current_acc = correct / total
+      avg_loss = total_loss / num_batches
+      
+      # Convergence check
+      improvement = current_acc - best_acc
+      if improvement > min_improvement:
+        best_acc = current_acc
+        no_improve = 0
+        print(f"Epoch {epoch+1} → New best accuracy: {best_acc:.4f} (+{improvement:.4f}), Loss: {avg_loss:.4f}")
+      else:
+        no_improve += 1
+        print(f"Epoch {epoch+1} → No improvement for {no_improve} epochs (best: {best_acc:.4f}, current: {current_acc:.4f}, Loss: {avg_loss:.4f})")
+      
+      if current_acc > 0.99:
+        print(f"\nEpoch {epoch+1} → High accuracy reached ({current_acc:.4f}), stopping to prevent overfitting.")
+        break
+          
+      if no_improve >= patience:
+        print(f"\nEpoch {epoch+1} → Convergence reached! No improvement for {patience} epochs. Stopping training.")
+        print(f"Best accuracy: {best_acc:.4f}")
+        break
 
   except KeyboardInterrupt:
-    print(" Moving to test")
+    print("Training interrupted")
 
-  model_classify.eval()
-  
-  # Return wrapped model
-  return ModelWrapper(model_classify, None, class_to_idx, num_classes)
+  model.eval()
+  return ModelWrapper(model, class_to_idx, num_classes)
 
 
 
@@ -286,8 +250,8 @@ def learn(path_to_in_domain, path_to_out_domain):
 
 
 def compute_accuracy(path_to_eval_folder, model):
-  # Extract models and class info from wrapper
-  model_classify = model.model_classify
+  # Extract model and class info from wrapper
+  model_eval = model.model
   class_to_idx = model.class_to_idx
   num_classes = model.num_classes
   
@@ -299,57 +263,35 @@ def compute_accuracy(path_to_eval_folder, model):
       transformed_img = eval_transform(img)
       eval_data.append((transformed_img, label))
 
-  device_classify = torch.device( "cuda" if torch.cuda.is_available() else "cpu")
-  model_classify = model_classify.to(device_classify)
-  model_classify.eval()  # Set to evaluation mode
-
-  # Determine true category label (0 for in-domain, 1 for out-domain)
-  true_category = 0 if "in-domain" in path_to_eval_folder else 1
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  model_eval = model_eval.to(device)
+  model_eval.eval()
 
   # Evaluate model
   correct = 0
   total = 0
 
-  # Process in batches (more efficient)
+  # Process in batches
   batch_size = 32
-  with torch.no_grad():  # Don't compute gradients during evaluation
+  with torch.no_grad():
     for i in range(0, len(eval_data), batch_size):
       batch = eval_data[i:i+batch_size]
-      # Expand batch processing: extract images and labels with extra checks, convert to tensors, and move to the required devices.
       image_list = []
       label_list = []
       for img, label in batch:
           image_list.append(img)
           label_list.append(label)
-      images = torch.stack(image_list).to(device_classify)
-      labels = torch.tensor(label_list).to(device_classify)
+      images = torch.stack(image_list).to(device)
+      labels = torch.tensor(label_list).to(device)
       
-      # First, determine if each image is in-domain or out-domain
-      outputs = model_classify(images)
-      _, predicted = torch.max(outputs.data, 1) # get the predicted class
-      
-      # Separate images and labels based on in/out domain prediction
-
-      
-      
-
-      # For in-domain images: classify them
-      images_to_classify_tensor = images 
-      labels_to_classify_tensor = labels 
-      
-      outputs = model_classify(images_to_classify_tensor)
+      # Get predictions
+      outputs = model_eval(images)
       _, predicted = torch.max(outputs.data, 1)
 
-      correct += (predicted == labels_to_classify_tensor).sum().item()
+      correct += (predicted == labels).sum().item()
       total += len(images)
-        
 
-          
-    
-
-  # Calculate accuracies
   accuracy = correct / total
-
   return accuracy
 
 
