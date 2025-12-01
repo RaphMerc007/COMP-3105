@@ -7,7 +7,6 @@ from torchvision.models import resnet18
 from PIL import Image
 
 
-
 # Wrapper class to hold the model
 class ModelWrapper:
   def __init__(self, model, class_to_idx, num_classes):
@@ -17,24 +16,31 @@ class ModelWrapper:
 
 
 def get_transforms(augment, normalize=False):
+  # Dataset-specific normalization constants (computed from training data)
+  DATASET_MEAN = [0.6219832301139832, 0.601443886756897, 0.57758629322052]
+  DATASET_STD = [0.36148154735565186, 0.36438843607902527, 0.3745814561843872]
   if augment:
     # Training transforms with aggressive data augmentation
-    transform = transforms.Compose([
+    transform_list = [
       transforms.Resize((280, 280)),  # larger for cropping
       transforms.RandomCrop((224, 224)),  # Random crop for augmentation
       transforms.RandomHorizontalFlip(p=0.5),  # Random horizontal flip
       transforms.RandomRotation(degrees=15),  # Random rotation up to 15 degrees
       transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.4, hue=0.3),  # color jitter
       transforms.ToTensor()
-    ])
+    ]
+    if normalize:
+      transform_list.append(transforms.Normalize(mean=DATASET_MEAN, std=DATASET_STD))
+    transform = transforms.Compose(transform_list)
   else:
     # Evaluation transforms (no augmentation)
-    transform = transforms.Compose([
+    transform_list = [
       transforms.Resize((224, 224)),
       transforms.ToTensor(),
-    ])
+    ]
     if normalize:
-      transform.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+      transform_list.append(transforms.Normalize(mean=DATASET_MEAN, std=DATASET_STD))
+    transform = transforms.Compose(transform_list)
   return transform
 
 
@@ -99,18 +105,16 @@ def learn(path_to_in_domain, path_to_out_domain):
   in_train = load_data(path_to_in_domain, has_labels=True, class_to_idx=class_to_idx)
   out_train = load_data(path_to_out_domain, has_labels=False)
 
-  augment_transform = get_transforms(augment=True)
-  no_augment_transform = get_transforms(augment=False)
+  # Use normalization consistently for all training data
+  augment_transform = get_transforms(augment=True, normalize=True)
+  no_augment_transform = get_transforms(augment=False, normalize=True)
   
   # Start with non-augmented versions
   in_train_augmented = [(no_augment_transform(img), label) for img, label in in_train]
   out_train_augmented = [no_augment_transform(img) for img in out_train]
         
-      # Augment data
+  # Augment data
   for i in range(6):
-    if i == 5:
-      augment_transform = get_transforms(True, True)
-      
     for img, label in in_train:
       in_train_augmented.append((augment_transform(img), label))
 
@@ -139,7 +143,7 @@ def learn(path_to_in_domain, path_to_out_domain):
 
   # Loss functions
   criterion_in = nn.CrossEntropyLoss()  # For in-domain: minimize cross-entropy
-  optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
+  optimizer = optim.Adam(model.parameters(), lr=0.003, weight_decay=0.0001)
   scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=8, gamma=0.8)
 
   model.train()
@@ -254,8 +258,8 @@ def compute_accuracy(path_to_eval_folder, model):
   num_classes = model.num_classes
   
   eval_data_pil = load_data(path_to_eval_folder, True, class_to_idx)
-  # Transform PIL images to tensors
-  eval_transform = get_transforms(False)
+  # Transform PIL images to tensors (use same normalization as training)
+  eval_transform = get_transforms(False, normalize=True)
   eval_data = []
   for img, label in eval_data_pil:
       transformed_img = eval_transform(img)
