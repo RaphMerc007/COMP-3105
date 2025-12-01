@@ -93,8 +93,9 @@ def compute_entropy(outputs):
   entropy = -torch.sum(probs * torch.log(probs + 1e-8), dim=1)
   return entropy.mean()
 
+
 # train the model using entropy-based approach
-def learn(path_to_in_domain, path_to_out_domain):
+def learn(path_to_in_domain, path_to_out_domain):  
   # Discover classes dynamically from in-domain training data
   class_to_idx, num_classes = discover_classes(path_to_in_domain)
   
@@ -108,8 +109,8 @@ def learn(path_to_in_domain, path_to_out_domain):
   # Start with non-augmented versions
   in_train_augmented = [(no_augment_transform(img), label) for img, label in in_train]
   out_train_augmented = [no_augment_transform(img) for img in out_train]
-  
-  # Augment data
+        
+      # Augment data
   for i in range(6):
     if i == 5:
       augment_transform = get_transforms(True, True)
@@ -117,7 +118,7 @@ def learn(path_to_in_domain, path_to_out_domain):
     for img, label in in_train:
       in_train_augmented.append((augment_transform(img), label))
 
-    # Balance out-domain data to match in-domain size
+      # Balance out-domain data to match in-domain size
     while len(out_train_augmented) != len(in_train_augmented):
       if len(out_train_augmented) < len(in_train_augmented):
         for img in out_train:
@@ -129,7 +130,7 @@ def learn(path_to_in_domain, path_to_out_domain):
           in_train_augmented.append((augment_transform(img), label))
           if len(out_train_augmented) <= len(in_train_augmented):
             break
-  
+    
   print(f"Augmented dataset created: {len(in_train_augmented)} in-domain images, {len(out_train_augmented)} out-domain images")
 
   # Create single model
@@ -147,8 +148,8 @@ def learn(path_to_in_domain, path_to_out_domain):
   scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=8, gamma=0.6)
 
   model.train()
-  batch_size = 64
-  patience = 20
+  batch_size = 100
+  patience = 10
   min_improvement = 0.002
   entropy_weight = 0.2  # Weight for entropy loss (can tune this)
 
@@ -242,7 +243,7 @@ def learn(path_to_in_domain, path_to_out_domain):
       ce_loss_history.append(epoch_ce_loss / num_batches)
       entropy_loss_history.append(epoch_entropy_loss / num_batches)
       out_conf_history.append(epoch_out_conf / num_batches)
-      
+
       # Convergence check
       improvement = current_acc - best_acc
       if improvement > min_improvement:
