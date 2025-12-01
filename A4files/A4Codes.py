@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
 from torchvision.models import resnet18
 from PIL import Image
 
@@ -338,53 +337,6 @@ entropy_loss_history = []       # Out-domain entropy loss (positive, not negated
 out_conf_history = []           # Avg out-domain confidence
 
 model = learn('./A4data/in-domain-train', './A4data/out-domain-train')
-
-#Plot training accuracy over epochs
-epochs = range(1, len(train_acc_history) + 1)
-
-plt.figure(figsize=(8, 5))
-plt.plot(epochs, train_acc_history, marker='o', label="Train Accuracy")
-plt.xlabel("Epoch")
-plt.ylabel("Accuracy")
-plt.title("In-Domain training Accuracy Over Epochs")
-plt.legend()
-plt.grid(alpha=0.3)
-plt.tight_layout()
-plt.savefig("/home/student/3105/A4files/train_accuracy.png")
-plt.close()
-
-#Plot CE loss per epoch
-plt.figure(figsize=(8,5))
-plt.plot(epochs, ce_loss_history, marker='o', label="Cross-Entropy Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.title("In-Domain CE Loss Over Epochs")
-plt.grid(alpha=0.3)
-plt.tight_layout()
-plt.savefig("/home/student/3105/A4files/CE_Loss.png")
-plt.close()
-
-# Plot entropy loss per epoch (non negated)
-plt.figure(figsize=(8,5))
-plt.plot(epochs, entropy_loss_history, marker='o', label="Out-Domain Entropy")
-plt.xlabel("Epoch")
-plt.ylabel("Entropy")
-plt.title("Out-Domain Entropy Over Epochs")
-plt.grid(alpha=0.3)
-plt.tight_layout()
-plt.savefig("/home/student/3105/A4files/Entropy_loss.png")
-plt.close()
-
-# Plot out domain confidence
-plt.figure(figsize=(8,5))
-plt.plot(epochs, out_conf_history, marker='o', label="Out-Domain Confidence")
-plt.xlabel("Epoch")
-plt.ylabel("Avg Max Softmax Probability")
-plt.title("Out-Domain Confidence Over Epochs")
-plt.grid(alpha=0.3)
-plt.tight_layout()
-plt.savefig("/home/student/3105/A4files/domain_confidence.png")
-plt.close()
 
 
 # Test on in-domain eval
