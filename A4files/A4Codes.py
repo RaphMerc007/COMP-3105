@@ -14,11 +14,12 @@ class ModelWrapper:
     self.class_to_idx = class_to_idx
     self.num_classes = num_classes
 
+DATASET_MEAN = []
+DATASET_STD = []
 
 def get_transforms(augment, normalize=False):
   # Dataset-specific normalization constants (computed from training data)
-  DATASET_MEAN = [0.6219832301139832, 0.601443886756897, 0.57758629322052]
-  DATASET_STD = [0.36148154735565186, 0.36438843607902527, 0.3745814561843872]
+  global DATASET_MEAN, DATASET_STD
   if augment:
     # Training transforms with aggressive data augmentation
     transform_list = [
@@ -89,6 +90,32 @@ def load_data(path, has_labels, class_to_idx=None):
   return images
 
 
+# Compute dataset mean and std for normalization
+def compute_dataset_stats(in_train, out_train, class_to_idx):  
+  # Load data
+  # Transform to tensor (resize and convert to tensor only, no normalization)
+  transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor()
+  ])
+  
+  # Collect all images
+  all_images = []
+  for img, _ in in_train:
+    all_images.append(transform(img))
+  for img in out_train:
+    all_images.append(transform(img))
+  
+  # Stack into tensor
+  images_tensor = torch.stack(all_images)
+  
+  # Compute mean and std across all images and all pixels
+  # Shape: [num_images, channels, height, width]
+  mean = images_tensor.mean(dim=(0, 2, 3))  # Mean across batch, height, width
+  std = images_tensor.std(dim=(0, 2, 3))    # Std across batch, height, width
+    
+  return mean.tolist(), std.tolist()
+
 
 # Compute entropy of predictions (for entropy maximization)
 def compute_entropy(outputs):
@@ -104,7 +131,11 @@ def learn(path_to_in_domain, path_to_out_domain):
   
   in_train = load_data(path_to_in_domain, has_labels=True, class_to_idx=class_to_idx)
   out_train = load_data(path_to_out_domain, has_labels=False)
+  mean, std = compute_dataset_stats(in_train, out_train, class_to_idx)
+  global DATASET_MEAN, DATASET_STD
 
+  DATASET_MEAN = mean
+  DATASET_STD = std
   # Use normalization consistently for all training data
   augment_transform = get_transforms(augment=True, normalize=True)
   no_augment_transform = get_transforms(augment=False, normalize=True)
@@ -143,13 +174,13 @@ def learn(path_to_in_domain, path_to_out_domain):
 
   # Loss functions
   criterion_in = nn.CrossEntropyLoss()  # For in-domain: minimize cross-entropy
-  optimizer = optim.Adam(model.parameters(), lr=0.003, weight_decay=0.0001)
+  optimizer = optim.Adam(model.parameters(), lr=0.002, weight_decay=0.0001)
   scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=8, gamma=0.8)
 
   model.train()
   batch_size = 64
-  patience = 10
-  min_improvement = 0.002
+  patience = 6
+  min_improvement = 0.01
   entropy_weight = 0.2  # Weight for entropy loss (can tune this)
 
   best_acc = 0.0
@@ -242,7 +273,7 @@ def learn(path_to_in_domain, path_to_out_domain):
     else:
       no_improve += 1
         
-    if no_improve >= patience or current_acc > 0.99:
+    if no_improve >= patience and current_acc > 0.98 or no_improve >= patience * 2:
       break
 
   
