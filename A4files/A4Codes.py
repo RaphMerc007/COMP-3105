@@ -1,4 +1,3 @@
-# TODO: Add necessary imports
 import os
 import torch
 import torch.nn as nn
@@ -50,7 +49,6 @@ def discover_classes(path):
   class_to_idx = {}
   for idx, cls in enumerate(classes):
       class_to_idx[cls] = idx
-  print(f"discovered classes: {classes}")
   return class_to_idx, len(classes)
 
 
@@ -104,7 +102,6 @@ def learn(path_to_in_domain, path_to_out_domain):
   augment_transform = get_transforms(augment=True)
   no_augment_transform = get_transforms(augment=False)
   
-  print("Creating augmented dataset...")
   # Start with non-augmented versions
   in_train_augmented = [(no_augment_transform(img), label) for img, label in in_train]
   out_train_augmented = [no_augment_transform(img) for img in out_train]
@@ -130,7 +127,6 @@ def learn(path_to_in_domain, path_to_out_domain):
           if len(out_train_augmented) <= len(in_train_augmented):
             break
     
-  print(f"Augmented dataset created: {len(in_train_augmented)} in-domain images, {len(out_train_augmented)} out-domain images")
 
   # Create single model
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -143,137 +139,112 @@ def learn(path_to_in_domain, path_to_out_domain):
 
   # Loss functions
   criterion_in = nn.CrossEntropyLoss()  # For in-domain: minimize cross-entropy
-  optimizer = optim.Adam(model.parameters(), lr=0.002, weight_decay=0.0001)
-  scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=8, gamma=0.6)
+  optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
+  scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=8, gamma=0.8)
 
   model.train()
-  batch_size = 100
+  batch_size = 64
   patience = 10
   min_improvement = 0.002
   entropy_weight = 0.2  # Weight for entropy loss (can tune this)
 
-
-
-  try:
-    best_acc = 0.0
-    no_improve = 0
+  best_acc = 0.0
+  no_improve = 0
+  
+  for epoch in range(100):
+    import random
+    random.shuffle(in_train_augmented)
+    random.shuffle(out_train_augmented)
     
-    for epoch in range(100):
-      import random
-      random.shuffle(in_train_augmented)
-      random.shuffle(out_train_augmented)
+    correct = 0
+    total = 0
+    total_loss = 0.0
+
+    epoch_ce_loss = 0.0
+    epoch_entropy_loss = 0.0
+    epoch_out_conf = 0.0
+
+    # Process in batches - alternate between in-domain and out-domain
+    num_batches = max(len(in_train_augmented), len(out_train_augmented)) // batch_size
+    
+    for batch_idx in range(num_batches):
+      # Get in-domain batch
+      in_start = (batch_idx * batch_size) % len(in_train_augmented)
+      in_batch = in_train_augmented[in_start:in_start + batch_size]
       
-      correct = 0
-      total = 0
-      total_loss = 0.0
-
-      epoch_ce_loss = 0.0
-      epoch_entropy_loss = 0.0
-      epoch_out_conf = 0.0
-
-      # Process in batches - alternate between in-domain and out-domain
-      num_batches = max(len(in_train_augmented), len(out_train_augmented)) // batch_size
+      in_images = []
+      in_labels = []
+      for img, label in in_batch:
+        in_images.append(img)
+        in_labels.append(label)
       
-      for batch_idx in range(num_batches):
-        # Get in-domain batch
-        in_start = (batch_idx * batch_size) % len(in_train_augmented)
-        in_batch = in_train_augmented[in_start:in_start + batch_size]
-        
-        in_images = []
-        in_labels = []
-        for img, label in in_batch:
-          in_images.append(img)
-          in_labels.append(label)
-        
-        in_images_tensor = torch.stack(in_images).to(device)
-        in_labels_tensor = torch.tensor(in_labels).to(device)
+      in_images_tensor = torch.stack(in_images).to(device)
+      in_labels_tensor = torch.tensor(in_labels).to(device)
 
-        # Get out-domain batch
-        out_start = (batch_idx * batch_size) % len(out_train_augmented)
-        out_batch = out_train_augmented[out_start:out_start + batch_size]
-        
-        out_images = []
-        for img in out_batch:
-          out_images.append(img)
-        
-        out_images_tensor = torch.stack(out_images).to(device)
-
-        # Forward pass and compute losses
-        optimizer.zero_grad()
-        
-        # In-domain: minimize cross-entropy (standard classification loss)
-        in_outputs = model(in_images_tensor)
-        in_loss = criterion_in(in_outputs, in_labels_tensor)
-        
-        # Out-domain: maximize entropy (minimize negative entropy)
-        out_outputs = model(out_images_tensor)
-        out_entropy = compute_entropy(out_outputs)
-
-        batch_ce_loss = in_loss.item()
-        batch_entropy_loss = out_entropy.item()
-
-        # Compute out-domain confidence (softmax max prob)
-        with torch.no_grad():
-            out_probs = torch.softmax(out_outputs, dim=1)
-            batch_max_conf = out_probs.max(dim=1).values.mean().item()
-
-        epoch_ce_loss += batch_ce_loss
-        epoch_entropy_loss += batch_entropy_loss
-        epoch_out_conf += batch_max_conf
-
-        out_loss = -out_entropy  # Negative because we want to maximize entropy
-        
-        # Combined loss
-        loss = in_loss + entropy_weight * out_loss
-        loss.backward()
-        optimizer.step()
-
-        # Track accuracy (only on in-domain)
-        total += in_labels_tensor.size(0)
-        _, predicted = torch.max(in_outputs.data, 1)
-        correct += (predicted == in_labels_tensor).sum().item()
-        total_loss += loss.item()
-
-      scheduler.step()
-      current_acc = correct / total
-      avg_loss = total_loss / num_batches
-
-      train_acc_history.append(current_acc)
-      ce_loss_history.append(epoch_ce_loss / num_batches)
-      entropy_loss_history.append(epoch_entropy_loss / num_batches)
-      out_conf_history.append(epoch_out_conf / num_batches)
-
-      # Convergence check
-      improvement = current_acc - best_acc
-      if improvement > min_improvement:
-        best_acc = current_acc
-        no_improve = 0
-        print(f"Epoch {epoch+1} → New best accuracy: {best_acc:.4f} (+{improvement:.4f}), Loss: {avg_loss:.4f}")
-      else:
-        no_improve += 1
-        print(f"Epoch {epoch+1} → No improvement for {no_improve} epochs (best: {best_acc:.4f}, current: {current_acc:.4f}, Loss: {avg_loss:.4f})")
+      # Get out-domain batch
+      out_start = (batch_idx * batch_size) % len(out_train_augmented)
+      out_batch = out_train_augmented[out_start:out_start + batch_size]
       
-      if current_acc > 0.99:
-        print(f"\nEpoch {epoch+1} → High accuracy reached ({current_acc:.4f}), stopping to prevent overfitting.")
-        break
-          
-      if no_improve >= patience:
-        print(f"\nEpoch {epoch+1} → Convergence reached! No improvement for {patience} epochs. Stopping training.")
-        print(f"Best accuracy: {best_acc:.4f}")
-        break
+      out_images = []
+      for img in out_batch:
+        out_images.append(img)
+      
+      out_images_tensor = torch.stack(out_images).to(device)
 
-  except KeyboardInterrupt:
-    print("Training interrupted")
+      # Forward pass and compute losses
+      optimizer.zero_grad()
+      
+      # In-domain: minimize cross-entropy (standard classification loss)
+      in_outputs = model(in_images_tensor)
+      in_loss = criterion_in(in_outputs, in_labels_tensor)
+      
+      # Out-domain: maximize entropy (minimize negative entropy)
+      out_outputs = model(out_images_tensor)
+      out_entropy = compute_entropy(out_outputs)
 
+      batch_ce_loss = in_loss.item()
+      batch_entropy_loss = out_entropy.item()
+
+      # Compute out-domain confidence (softmax max prob)
+      with torch.no_grad():
+          out_probs = torch.softmax(out_outputs, dim=1)
+          batch_max_conf = out_probs.max(dim=1).values.mean().item()
+
+      epoch_ce_loss += batch_ce_loss
+      epoch_entropy_loss += batch_entropy_loss
+      epoch_out_conf += batch_max_conf
+
+      out_loss = -out_entropy  # Negative because we want to maximize entropy
+      
+      # Combined loss
+      loss = in_loss + entropy_weight * out_loss
+      loss.backward()
+      optimizer.step()
+
+      # Track accuracy (only on in-domain)
+      total += in_labels_tensor.size(0)
+      _, predicted = torch.max(in_outputs.data, 1)
+      correct += (predicted == in_labels_tensor).sum().item()
+      total_loss += loss.item()
+
+    scheduler.step()
+    current_acc = correct / total
+
+    # Convergence check
+    improvement = current_acc - best_acc
+    if improvement > min_improvement:
+      best_acc = current_acc
+      no_improve = 0
+    else:
+      no_improve += 1
+        
+    if no_improve >= patience or current_acc > 0.99:
+      break
+
+  
   model.eval()
 
-
   return ModelWrapper(model, class_to_idx, num_classes)
-
-
-
-
-
 
 
 def compute_accuracy(path_to_eval_folder, model):
@@ -299,7 +270,7 @@ def compute_accuracy(path_to_eval_folder, model):
   total = 0
 
   # Process in batches
-  batch_size = 32
+  batch_size = 64
   with torch.no_grad():
     for i in range(0, len(eval_data), batch_size):
       batch = eval_data[i:i+batch_size]
@@ -320,35 +291,3 @@ def compute_accuracy(path_to_eval_folder, model):
 
   accuracy = correct / total
   return accuracy
-
-
-
-
-
-
-
-import time
-time_start = time.time()
-
-# Graph plot stuff
-train_acc_history = []
-ce_loss_history = []
-entropy_loss_history = []       # Out-domain entropy loss (positive, not negated)
-out_conf_history = []           # Avg out-domain confidence
-
-model = learn('./A4data/in-domain-train', './A4data/out-domain-train')
-
-
-# Test on in-domain eval
-in_acc = compute_accuracy('./A4data/in-domain-eval', model)
-print(f"In-domain accuracy: {in_acc:.4f}")
-
-# Test on out-domain eval
-out_acc = compute_accuracy('./A4data/out-domain-eval', model)
-print(f"Out-domain accuracy: {out_acc:.4f}")
-
-
-
-
-time_end = time.time()
-print(f"Time taken: {(time_end - time_start)/60:.2f} minutes")
